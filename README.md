@@ -1,4 +1,6 @@
-# Development (Linux)
+# Postgraduate Deep Learning project
+
+## Setup development environment in Linux
 
 These are the steps to setup a development environment for Linux after cloning this repository:
 
@@ -36,3 +38,5 @@ mkdir data/CelebA-HQ/images
 mv ~/Downloads/CelebAMask-HQ.zip data/CelebA-HQ/images/.
 unzip data/CelebA-HQ/CelebAMask-HQ.zip
 ```
+
+4. [WIP]
