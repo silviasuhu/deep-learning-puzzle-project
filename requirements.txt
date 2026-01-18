@@ -1,0 +1,3 @@
+pillow # for images
+torch
+numpy
