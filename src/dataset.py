@@ -1,9 +1,34 @@
 import os
-
 import torch
+from torch.utils.data import Dataset
 import torch_geometric  # for graph data handling
-
 from PIL import Image
+
+
+def split_image_into_patches(image, patch_size):
+    """
+    Split a CxHxW image (non-overlapping patches) and normalizes coordinates to [-1, 1]
+    Centered at 0,0 -> centered,symmetric,numerically stable for diffusion models).
+    """
+
+    channels, height, width = image.shape
+    # Calculate grid size
+    grid_h = height // patch_size
+    grid_w = width // patch_size
+
+    # We want to split along height and width so channles should be last. torch.Tensor.unfold(dim, size, step)
+    image2 = image.permute(1, 2, 0)  # CxHxW -> HxWxC
+    patches = image2.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
+
+    # Create normalized coordinates [-1, 1]
+    y_coords = torch.linspace(-1, 1, grid_h)
+    x_coords = torch.linspace(-1, 1, grid_w)
+
+    xy = torch.stack(
+        torch.meshgrid(x_coords, y_coords, indexing="xy"), -1
+    )  # [grid_w, grid_h, 2]
+    xy = xy.permute(1, 0, 2)  # [grid_h, grid_w, 2], match patch order
+    return xy, patches
 
 
 class CelebA_DataSet(torch.utils.data.Dataset):
