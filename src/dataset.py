@@ -11,10 +11,10 @@ def split_image_into_patches(image, patch_size):
     Centered at 0,0 -> centered,symmetric,numerically stable for diffusion models).
     """
 
-    Channels, Height, Width = image.shape
+    channels, height, width = image.shape
     # Calculate grid size
-    grid_h = Height // patch_size
-    grid_w = Width // patch_size
+    grid_h = height // patch_size
+    grid_w = width // patch_size
 
     # We want to split along height and width so channles should be last. torch.Tensor.unfold(dim, size, step)
     image2 = image.permute(1, 2, 0)  # CxHxW -> HxWxC
