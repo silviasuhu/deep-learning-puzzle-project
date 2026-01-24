@@ -1,5 +1,8 @@
 import os
+
 import torch
+import torch_geometric  # for graph data handling
+
 from PIL import Image
 
 
@@ -20,6 +23,33 @@ class CelebA_DataSet(torch.utils.data.Dataset):
         if self.transform:
             img = self.transform(img)
         return img
+
+
+class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
+    def __init__(self, dataset=None, num_patches_x=6, num_patches_y=6):
+        super().__init__()
+
+        assert dataset is not None, "Dataset must be provided"
+        self.dataset = dataset
+
+        self.num_patches_x = num_patches_x
+        self.num_patches_y = num_patches_y
+
+    def len(self):
+        return len(self.dataset)
+
+    def get(self, idx):
+        img = self.dataset[idx]
+
+        graph_data = torch_geometric.data.Data(
+            x=None,  # Node features
+            indexes=None,  # Node indices
+            edge_index=None,  # Edge indices
+        )
+        # Placeholder for graph conversion logic
+        # Here you would convert the image to a graph representation
+        graph_data = torch_geometric.data.Data()  # Replace with actual graph data
+        return graph_data
 
 
 # Testing the CelebA_DataSet class

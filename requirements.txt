@@ -1,3 +1,8 @@
 pillow # for images
 torch
 numpy
+einops # for tensor rearranging
+torch-geometric # for graph neural networks
+torchvision # for datasets and image transformations
+scipy
+argparse
