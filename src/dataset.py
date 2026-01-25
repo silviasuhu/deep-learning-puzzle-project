@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 import torch_geometric
 from torch_geometric.data import Data
+import torchvision.transforms.functional as TF
 
 
 def split_image_into_patches(image, num_patches_x, num_patches_y):
@@ -33,6 +34,19 @@ def split_image_into_patches(image, num_patches_x, num_patches_y):
     )  # [grid_w, grid_h, 2]
     xy = xy.permute(1, 0, 2)  # [grid_h, grid_w, 2], match patch order
     return xy, patches  # patches[i] = one puzzle piece, xy[i] = where it belongs
+
+
+def fully_connected_edge_index(num_nodes, device):
+    """
+    Create a fully-connected (dense) edge list without self-loops.
+    """
+    if num_nodes <= 1:
+        return torch.empty((2, 0), dtype=torch.long, device=device)
+    row = torch.arange(num_nodes, device=device).repeat_interleave(num_nodes)
+    col = torch.arange(num_nodes, device=device).repeat(num_nodes)
+    mask = row != col
+    edge_index = torch.stack([row[mask], col[mask]], dim=0)
+    return edge_index
 
 
 class CelebA_DataSet(torch.utils.data.Dataset):
@@ -72,7 +86,12 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
         return len(self.dataset)
 
     def get(self, idx):
-        image = self.dataset[idx]  # [C,H,W]
+        image = self.dataset[idx]
+        if isinstance(image, Image.Image):
+            image = TF.to_tensor(image)
+        if not isinstance(image, torch.Tensor):
+            raise TypeError("Dataset must return a torch.Tensor or PIL.Image.")
+        # image: [C, H, W]
         # grid-aware split
         coordinates_xy, patches = split_image_into_patches(
             image, self.num_patches_x, self.num_patches_y
@@ -85,13 +104,29 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
         coordinates_xy = einops.rearrange(coordinates_xy, "h w c -> (h w) c")
 
         # Add rotation
-        theta = torch.zeros(coordinates_xy.size(0))
+        theta = torch.zeros(coordinates_xy.size(0), device=coordinates_xy.device)
         sin_cos = torch.stack([theta.sin(), theta.cos()], dim=-1)
         pose_gt = torch.cat([coordinates_xy, sin_cos], dim=-1)  # [N, 4]
 
+        # Shuffle patches and pose_gt in the same way
+        perm = torch.randperm(patches.size(0))
+        patches = patches[perm]
+        pose_gt = pose_gt[perm]
+
+        # Optionally drop some patches
+        if self.drop_ratio > 0:
+            Number_patches = patches.size(0)
+            remaining_patches = int((1 - self.drop_ratio) * Number_patches)
+            patches = patches[:remaining_patches]
+            pose_gt = pose_gt[:remaining_patches]
+
+        edge_index = fully_connected_edge_index(patches.size(0), patches.device)
+
         # Convert to graph data
         graph_data = Data(
-            x=patches, pose_gt=pose_gt  # node features  # diffusion target
+            x=patches,
+            edge_index=edge_index,
+            pose_gt=pose_gt,  # node features  # diffusion target
         )
 
         return graph_data
