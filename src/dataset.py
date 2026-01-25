@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn.functional as F
 import einops
 from torch.utils.data import Dataset
 from PIL import Image
@@ -19,11 +20,21 @@ def split_image_into_patches(image, num_patches_x, num_patches_y):
     patch_h = height // num_patches_y
     patch_w = width // num_patches_x
 
-    # We want to split along height and width so channles should be last. torch.Tensor.unfold(dim, size, step)
-    image2 = image.permute(1, 2, 0)  # CxHxW -> HxWxC
-    patches = image2.unfold(0, patch_h, patch_h).unfold(
-        1, patch_w, patch_w
-    )  # shape: [num_patches_y, num_patches_x, patch_h, patch_w, C]
+    h_crop = patch_h * num_patches_y
+    w_crop = patch_w * num_patches_x
+    image = image[:, :h_crop, :w_crop]
+
+    unfolded = F.unfold(
+        image.unsqueeze(0),
+        kernel_size=(patch_h, patch_w),
+        stride=(patch_h, patch_w),
+    )
+    # unfolded: (1, C*patch_h*patch_w, num_patches)
+    patches = unfolded.view(
+        channels, patch_h, patch_w, num_patches_y, num_patches_x
+    ).permute(
+        3, 4, 0, 1, 2
+    )  # [h, w, C, ph, pw]
 
     # Create normalized coordinates [-1, 1]
     y_coords = torch.linspace(-1, 1, num_patches_y)
@@ -74,19 +85,29 @@ class CelebA_DataSet(torch.utils.data.Dataset):
 
 
 class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
-    def __init__(self, dataset=None, num_patches_x=6, num_patches_y=6, drop_ratio=0.0):
+    def __init__(
+        self,
+        dataset=None,
+        num_patches_x=6,
+        num_patches_y=6,
+        drop_ratio=0.0,
+        image_size=None,
+    ):
         super().__init__()
 
         self.dataset = dataset
         self.num_patches_x = num_patches_x
         self.num_patches_y = num_patches_y
         self.drop_ratio = drop_ratio
+        self.image_size = image_size
 
     def len(self):
         return len(self.dataset)
 
     def get(self, idx):
         image = self.dataset[idx]
+        if self.image_size is not None:
+            image = TF.resize(image, [self.image_size, self.image_size])
         if isinstance(image, Image.Image):
             image = TF.to_tensor(image)
         if not isinstance(image, torch.Tensor):
@@ -100,7 +121,7 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
         # number_of_patches != grid_h * grid_w, multiple grid sizes, missing patches,padding / cropping,random resizing,rotation-only variants
 
         # Flatten patches and coordinates
-        patches = einops.rearrange(patches, "h w ph pw c -> (h w) c ph pw")
+        patches = einops.rearrange(patches, "h w c ph pw -> (h w) c ph pw")
         coordinates_xy = einops.rearrange(coordinates_xy, "h w c -> (h w) c")
 
         # Add rotation
@@ -126,6 +147,7 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
         graph_data = Data(
             x=patches,
             edge_index=edge_index,
+            pos=coordinates_xy,
             pose_gt=pose_gt,  # node features  # diffusion target
         )
 
@@ -141,3 +163,10 @@ if __name__ == "__main__":
     print(f"Dataset size: {len(dataset)}")
     sample_img = dataset[0]
     print(f"Sample image size: {sample_img.size}")
+
+    graph_dataset = CelebA_Graph_Dataset(dataset, num_patches_x=6, num_patches_y=6)
+    graph = graph_dataset.get(0)
+    print(f"Graph nodes: {graph.num_nodes}")
+    print(f"Graph edges: {graph.edge_index.size(1)}")
+    print(f"x shape: {graph.x.shape}")
+    print(f"pose_gt shape: {graph.pose_gt.shape}")
