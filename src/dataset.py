@@ -101,6 +101,7 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
 
         # Flatten patches and coordinates
         patches = einops.rearrange(patches, "h w ph pw c -> (h w) c ph pw")
+        # patches = patches.permute(0, 1, 3, 2).contiguous()
         coordinates_xy = einops.rearrange(coordinates_xy, "h w c -> (h w) c")
 
         # Add rotation
@@ -141,3 +142,10 @@ if __name__ == "__main__":
     print(f"Dataset size: {len(dataset)}")
     sample_img = dataset[0]
     print(f"Sample image size: {sample_img.size}")
+
+    graph_dataset = CelebA_Graph_Dataset(dataset, num_patches_x=6, num_patches_y=6)
+    graph = graph_dataset.get(0)
+    print(f"Graph nodes: {graph.num_nodes}")
+    print(f"Graph edges: {graph.edge_index.size(1)}")
+    print(f"x shape: {graph.x.shape}")
+    print(f"pose_gt shape: {graph.pose_gt.shape}")
