@@ -6,3 +6,4 @@ torch-geometric # for graph neural networks
 torchvision # for datasets and image transformations
 scipy
 argparse
+timm # for pre-trained models
