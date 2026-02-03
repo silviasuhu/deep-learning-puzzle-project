@@ -20,6 +20,7 @@ def split_image_into_patches(image, num_patches_x, num_patches_y):
     patch_h = height // num_patches_y
     patch_w = width // num_patches_x
 
+    # Resize image to fit exact number of patches
     h_crop = patch_h * num_patches_y
     w_crop = patch_w * num_patches_x
     image = image[:, :h_crop, :w_crop]
@@ -101,12 +102,14 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
         self.drop_ratio = drop_ratio
         self.image_size = image_size
 
-    def len(self):
+    def __len__(self):
         return len(self.dataset)
 
     def get(self, idx):
         image = self.dataset[idx]
         if self.image_size is not None:
+            # Resize to fixed resolution for batching
+            # Crop afterwards to ensure exact patch grid (inside split_image_into_patches)
             image = TF.resize(image, [self.image_size, self.image_size])
         if isinstance(image, Image.Image):
             image = TF.to_tensor(image)
@@ -132,6 +135,7 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
         # Shuffle patches and pose_gt in the same way
         perm = torch.randperm(patches.size(0))
         patches = patches[perm]
+        coordinates_xy = coordinates_xy[perm]
         pose_gt = pose_gt[perm]
 
         # Optionally drop some patches
@@ -139,6 +143,7 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
             Number_patches = patches.size(0)
             remaining_patches = int((1 - self.drop_ratio) * Number_patches)
             patches = patches[:remaining_patches]
+            coordinates_xy = coordinates_xy[:remaining_patches]
             pose_gt = pose_gt[:remaining_patches]
 
         edge_index = fully_connected_edge_index(patches.size(0), patches.device)
