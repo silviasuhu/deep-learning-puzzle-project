@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 from dataset import CelebA_DataSet, CelebA_Graph_Dataset
-from src.model.model import Eff_GAT
+from model.efficient_gat import Eff_GAT
 from puzzle_dataset import Puzzle_Dataset
 
 
