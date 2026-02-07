@@ -2,9 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.graphgym.register import register_layer
 from torch_geometric.nn.conv.transformer_conv import TransformerConv
-from torch_scatter import scatter
+
 
 def get_activation(activation):
     if activation == "relu":
@@ -158,7 +157,9 @@ class Exophormer_GNN(nn.Module):
             self.virt_node_embedding = nn.Embedding(virt_nodes, input_size)
         self.n_layers = n_layers
 
-    def forward(self, x, edge_index, move_to_cpu=False, batch=None, mean_value=False, *args):
+    def forward(
+        self, x, edge_index, move_to_cpu=False, batch=None, mean_value=False, *args
+    ):
         attentions = []
 
         n_graphs = batch.max() + 1
@@ -167,18 +168,20 @@ class Exophormer_GNN(nn.Module):
         if self.virt_nodes > 0:
             # adding virtual nodes
             virtual_nodes = torch.arange(self.virt_nodes).repeat(n_graphs).to(device)
-            #breakpoint()
+            # breakpoint()
             if mean_value:
-                virt_nodes_h = x.mean(dim=0).unsqueeze_(0).repeat(self.virt_nodes*n_graphs, 1)
-                #print(virt_nodes_h.size())
+                virt_nodes_h = (
+                    x.mean(dim=0).unsqueeze_(0).repeat(self.virt_nodes * n_graphs, 1)
+                )
+                # print(virt_nodes_h.size())
             else:
                 virt_nodes_h = self.virt_node_embedding(virtual_nodes)
-                #print(virt_nodes_h.size())
-            #print(x.size())
+                # print(virt_nodes_h.size())
+            # print(x.size())
             x = torch.cat((x, virt_nodes_h))
-           # print(x.size())
+            # print(x.size())
             batch = torch.cat(
-                (batch, torch.arange(n_graphs).repeat(self.virt_nodes).to(device)) # type: ignore
+                (batch, torch.arange(n_graphs).repeat(self.virt_nodes).to(device))  # type: ignore
             )
             virt_edges = []
 
@@ -191,7 +194,7 @@ class Exophormer_GNN(nn.Module):
                     )
                     .repeat(num_nodes)
                     .to(device)
-            )
+                )
                 virt_edges.append(virt_edge)
 
             virt_edges = torch.cat(virt_edges)
