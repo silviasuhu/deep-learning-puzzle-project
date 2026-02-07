@@ -2,9 +2,11 @@
 # separately. This is because they have specific versions that are compatible with the PyTorch 
 # Geometric version we are using, and they need to be installed from specific sources to avoid
 # conflicts. See README.md for more details.
+transformers
 pillow # for images
 numpy
 einops # for tensor rearranging
 scipy
 argparse
 timm # for pre-trained models
+matplotlib # for notebook visualization
