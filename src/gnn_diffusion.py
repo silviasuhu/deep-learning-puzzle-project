@@ -77,3 +77,31 @@ class GNN_Diffusion:
         loss.backward()
         optimizer.step()
         return loss.item()
+
+    def validation_step(self, batch, model, criterion):
+
+        # move batch to GPU/CPU
+        batch = batch.to(self.device)
+        batch_size_graphs = batch.batch.max().item() + 1
+        # One timestep per graph
+        t = torch.randint(
+            0, self.steps, (batch_size_graphs,), device=self.device
+        ).long()
+        # Expand t to node-level: each node gets its graph's timestep
+        t = torch.gather(t, 0, batch.batch)
+        # clean node feature (positions + rotations, etc.)
+        x_start = batch.x
+        noise = torch.randn_like(x_start)
+        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        # CNN features from image patches
+        patch_feats = model.visual_features(batch.patches)
+        # 6. Predict noise with GNN
+        prediction, _ = model.forward_with_feats(
+            x_noisy, t, batch.patches, batch.edge_index, patch_feats, batch.batch
+        )
+        # Compute validation lose
+        # Target = true noise
+        # Prediction = model's noise estimate
+        val_loss = criterion(noise, prediction)
+        # Store scalar loss
+        return val_loss

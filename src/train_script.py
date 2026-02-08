@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 import torch
 import torch_geometric
 import numpy as np
@@ -8,6 +9,8 @@ from puzzle_dataset import Puzzle_Dataset_ROT
 from gnn_diffusion import GNN_Diffusion
 from transformers.optimization import Adafactor
 from model.efficient_gat import Eff_GAT
+from torch.utils.data import random_split
+import wandb
 
 
 def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
@@ -30,8 +33,24 @@ def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
     # If puzzles_sizes is [2, 4, 7], then patch_per_dim will be [(2, 2), (4, 4), (7, 7)]
     patch_per_dim = [(x, x) for x in puzzle_sizes]
 
+    # Start a new wandb run to track this script.
+    run = wandb.init(
+        entity="postgraduate-project-puzzle-upc",
+        project="my-awesome-project",
+        # Track hyperparameters and run metadata.
+        config={
+            "batch_size": batch_size,
+            "steps": steps,
+            "epochs": epochs,
+            "patch_per_dim": patch_per_dim,
+            "model": "Eff_gat",
+            "optimizer": "Adafactor",
+            "loss": "smooth_l1",
+        },
+    )
+
     train_dt = CelebA_DataSet(train=True)
-    dataset = Puzzle_Dataset_ROT(
+    train_validation_dataset = Puzzle_Dataset_ROT(
         dataset=train_dt,
         patch_per_dim=patch_per_dim,
         augment=False,
@@ -40,20 +59,74 @@ def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
         all_equivariant=False,
         random_dropout=False,
     )
+    # split dataset training and validation:
+    val_ratio = 0.1
+    val_size = int(len(train_validation_dataset) * val_ratio)
+    train_size = len(train_validation_dataset) - val_size
 
-    dataloader = torch_geometric.loader.DataLoader(
-        dataset, batch_size=batch_size, shuffle=True
+    train_dataset, val_dataset = random_split(
+        train_validation_dataset,
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(42),
+    )
+
+    train_loader = torch_geometric.loader.DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True
+    )
+    val_loader = torch_geometric.loader.DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=True
     )
 
     gnn_diffusion = GNN_Diffusion(steps=steps)
 
-    model.train()
+    checkpoint_dir = Path("outputs") / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
     for epoch in range(epochs):
-        losses = []
-        for batch in dataloader:
+        model.train()
+        train_losses = []
+        for batch in train_loader:
+            batch = batch.to(device)
             loss = gnn_diffusion.training_step(batch, model, criterion, optimizer)
-            losses.append(loss)
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {np.mean(losses):.4f}")
+            # losses.append(loss)
+            train_losses.append(loss)
+        train_loss = np.mean(train_losses)
+
+        # VALIDATION
+        # switch model to evaluation mode
+        model.eval()
+        val_losses = []
+
+        # disable gradient tracking (save memory,prevents accidental backprop)
+        with torch.no_grad():
+            for batch in val_loader:
+                val_loss = gnn_diffusion.validation_step(batch, model, criterion)
+                val_losses.append(val_loss.item())
+
+        val_loss_mean = np.mean(val_losses)
+        # -------- LOGGING --------
+        run.log(
+            {"epoch": epoch + 1, "train/loss": train_loss, "val/loss": val_loss_mean}
+        )
+
+        print(
+            f"Epoch [{epoch+1}/{epochs}] "
+            f"Train Loss: {train_loss:.4f} "
+            f"Val Loss: {val_loss:.4f}"
+        )
+        run.log({"train/loss": train_loss, "epoch": epoch + 1})
+        run.finish()
+
+        print(
+            f"Epoch [{epoch+1}/{epochs}] "
+            f"Train Loss: {train_loss:.4f} "
+            f"Val Loss: {val_loss:.4f}"
+        )
+        #   ---- CHECKPOINT ----
+        if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
+            checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"Saved checkpoint: {checkpoint_path}")
 
 
 if __name__ == "__main__":
