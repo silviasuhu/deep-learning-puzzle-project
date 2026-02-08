@@ -3,6 +3,7 @@ from pathlib import Path
 import torch
 import torch_geometric
 import numpy as np
+import logging
 
 from dataset_celeb_rot import CelebA_DataSet, CelebA_Graph_Dataset
 from puzzle_dataset import Puzzle_Dataset_ROT
@@ -11,6 +12,17 @@ from transformers.optimization import Adafactor
 from model.efficient_gat import Eff_GAT
 from torch.utils.data import random_split
 import wandb
+
+# You can adjust the logging level to:
+#    - DEBUG to see all messages
+#    - INFO to see only higher-level messages
+#    - WARNING to see only warnings and errors
+#    - ERROR to see only errors
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s: %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 
 def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
@@ -109,24 +121,26 @@ def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
             {"epoch": epoch + 1, "train/loss": train_loss, "val/loss": val_loss_mean}
         )
 
-        print(
+        logger.info(
             f"Epoch [{epoch+1}/{epochs}] "
             f"Train Loss: {train_loss:.4f} "
-            f"Val Loss: {val_loss:.4f}"
+            f"Val Loss: {val_loss_mean:.4f}"
         )
         run.log({"train/loss": train_loss, "epoch": epoch + 1})
         run.finish()
 
-        print(
+        logger.info(
             f"Epoch [{epoch+1}/{epochs}] "
             f"Train Loss: {train_loss:.4f} "
-            f"Val Loss: {val_loss:.4f}"
+            f"Val Loss: {val_loss_mean:.4f}"
         )
-        #   ---- CHECKPOINT ----
+
+        # ---- CHECKPOINT ----
+        # Save a checkpoint every 5 epochs and at the last epoch
         if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
             checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
             torch.save(model.state_dict(), checkpoint_path)
-            print(f"Saved checkpoint: {checkpoint_path}")
+            logger.info(f"Saved checkpoint: {checkpoint_path}")
 
 
 if __name__ == "__main__":
@@ -145,5 +159,6 @@ if __name__ == "__main__":
     )
 
     args = ap.parse_args()
-    print(args)
+    logger.info(f"Arguments: {args}")
+
     main(args.batch_size, args.steps, args.epochs, args.puzzle_sizes)

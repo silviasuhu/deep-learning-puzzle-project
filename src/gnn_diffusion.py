@@ -1,4 +1,7 @@
 import torch
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def extract(a, t):
@@ -35,12 +38,13 @@ class GNN_Diffusion:
         return sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
 
     def training_step(self, batch, model, criterion, optimizer):
-        print("Start training_step")
+        logger.debug("Start training_step")
 
         optimizer.zero_grad()
 
         # Initialize the variables that will be used
         batch_size = batch.batch.max().item() + 1
+        logger.debug(f"Batch size: {batch_size}")
 
         # t is a 1D tensor of size 'batch_size' with random integers between [0 and steps)
         # It represents the diffusion time step for each graph in the batch
@@ -48,31 +52,43 @@ class GNN_Diffusion:
 
         # Expand t to match the number of nodes in the batch
         t = torch.gather(t, 0, batch.batch)
-
+        logger.debug(f"t shape: {t.shape}")
+        logger.debug(f"t example: {t[:10]}")
         # x_start contains the good positions and rotations of each patch
         x_start = batch.x
+
+        logger.debug(f"x_start shape: {x_start.shape}")
+        logger.debug(f"x_start example: {x_start[0]}")
 
         # Get a random noise
         noise = torch.randn_like(x_start)
 
         # Compute x_noisy
-        print("Compute x_noisy")
+        logger.debug("Compute x_noisy")
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-
+        logger.debug(f"x_noisy shape: {x_noisy.shape}")
+        logger.debug(f"x_noisy example: {x_noisy[0]}")
         # Compute patch_feats
-        print("Compute patch_feats")
+        logger.debug("Compute patch_feats")
         patch_feats = model.visual_features(batch.patches)
+        logger.debug(f"patch_feats shape: {patch_feats.shape}")
+        logger.debug(f"patch_feats example: {patch_feats[0]}")
 
         # Compute prediction
-        print("Compute prediction")
+        logger.debug("Compute prediction")
         prediction, attentions = model.forward_with_feats(
             x_noisy, t, batch.patches, batch.edge_index, patch_feats, batch.batch
         )
+        logger.debug(f"prediction shape: {prediction.shape}")
+        logger.debug(f"prediction example: {prediction[0]}")
 
         # Compute loss
-        print("Compute loss")
+        logger.debug("Compute loss")
         target = noise
         loss = criterion(target, prediction)
+        logger.debug(f"loss: {loss.item()}")
+        logger.debug(f"target shape: {target.shape}")
+        logger.debug(f"target example: {target[0]}")
 
         loss.backward()
         optimizer.step()
