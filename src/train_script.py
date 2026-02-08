@@ -1,57 +1,57 @@
 import argparse
 import torch
+import torch_geometric
 import numpy as np
 
-from dataset import CelebA_DataSet, CelebA_Graph_Dataset
+from dataset_celeb_rot import CelebA_DataSet, CelebA_Graph_Dataset
+from puzzle_dataset import Puzzle_Dataset_ROT
+from gnn_diffusion import GNN_Diffusion
+from transformers.optimization import Adafactor
 from model.efficient_gat import Eff_GAT
-from puzzle_dataset import Puzzle_Dataset
 
 
-def training_step(model, batch, criterion, optimizer, steps):
-    optimizer.zero_grad()
+def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
 
-    batch_size = batch.batch.max().item() + 1
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # t is a 1D tensor of size 'batch_size' with random integers between [0 and steps)
-    # It represents the diffusion time step for each graph in the batch
-    t = torch.randint(0, steps, (batch_size,), device=model.device).long()
+    model = Eff_GAT(
+        steps=steps,
+        input_channels=4,
+        output_channels=4,
+        n_layers=4,
+        model="resnet18equiv",
+    )
+    model.to(device)
 
-    # Expand t to match the number of nodes in the batch
-    new_t = torch.gather(t, 0, batch.batch)
+    criterion = torch.nn.functional.smooth_l1_loss
+    optimizer = Adafactor(model.parameters())
 
-    # TODO
+    # Create a list of tuples containing the actual puzzle sizes
+    # If puzzles_sizes is [2, 4, 7], then patch_per_dim will be [(2, 2), (4, 4), (7, 7)]
+    patch_per_dim = [(x, x) for x in puzzle_sizes]
 
-    # for key in batch.keys():
-    #     print("SSS batch key:", key)
-
-    outputs = model(batch)
-    loss = criterion(outputs, batch.y)
-    loss.backward()
-    optimizer.step()
-    return loss.item()
-
-
-def main(batch_size, steps, epochs, puzzle_sizes):
-    model = Eff_GAT(steps=steps)
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    dataset = Puzzle_Dataset(
-        dataset=CelebA_DataSet(train=True),
-        patch_per_dim=[(x, x) for x in puzzle_sizes],
+    train_dt = CelebA_DataSet(train=True)
+    dataset = Puzzle_Dataset_ROT(
+        dataset=train_dt,
+        patch_per_dim=patch_per_dim,
         augment=False,
         degree=-1,
         unique_graph=None,
+        all_equivariant=False,
+        random_dropout=False,
     )
-    dataloader = torch.utils.data.DataLoader(
+
+    dataloader = torch_geometric.loader.DataLoader(
         dataset, batch_size=batch_size, shuffle=True
     )
+
+    gnn_diffusion = GNN_Diffusion(steps=steps)
 
     model.train()
     for epoch in range(epochs):
         losses = []
         for batch in dataloader:
-            loss = training_step(model, batch, criterion, optimizer, steps)
+            loss = gnn_diffusion.training_step(batch, model, criterion, optimizer)
             losses.append(loss)
         print(f"Epoch [{epoch+1}/{epochs}], Loss: {np.mean(losses):.4f}")
 

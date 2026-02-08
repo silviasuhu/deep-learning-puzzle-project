@@ -222,7 +222,6 @@ class Puzzle_Dataset(pyg_data.Dataset):
     def __init__(
         self,
         dataset=None,
-        dataset_get_fn=None,
         patch_per_dim=[(7, 6)],
         patch_size=32,
         augment="",
@@ -232,9 +231,8 @@ class Puzzle_Dataset(pyg_data.Dataset):
     ) -> None:
         super().__init__()
 
-        assert dataset is not None and dataset_get_fn is not None
+        assert dataset is not None
         self.dataset = dataset
-        self.dataset_get_fn = dataset_get_fn
         self.patch_per_dim = patch_per_dim
         self.unique_graph = unique_graph
         self.augment = augment
@@ -262,7 +260,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
 
     def get(self, idx):
         if self.dataset is not None:
-            img = self.dataset_get_fn(self.dataset[idx])
+            img = self.dataset[idx]
 
         rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
         patch_per_dim = self.patch_per_dim[rdim]
@@ -307,255 +305,10 @@ class Puzzle_Dataset(pyg_data.Dataset):
         return data
 
 
-class Puzzle_Dataset_Pad(Puzzle_Dataset):
-    def __init__(
-        self,
-        dataset=None,
-        dataset_get_fn=None,
-        patch_per_dim=[(7, 6)],
-        patch_size=32,
-        padding=0,
-        augment=False,
-        degree=-1,
-        unique_graph=None,
-    ) -> None:
-        super().__init__(
-            dataset=dataset,
-            dataset_get_fn=dataset_get_fn,
-            patch_per_dim=patch_per_dim,
-            patch_size=patch_size,
-            augment=augment,
-            degree=degree,
-            unique_graph=unique_graph,
-        )
-        self.padding = padding
-
-    def zero_margin(self, tensor):
-        # Set the border elements of each batch image to zero
-        tensor[:, :, : self.padding, :] = 0  # Top rows
-        tensor[:, :, -self.padding :, :] = 0  # Bottom rows
-        tensor[:, :, :, : self.padding] = 0  # Leftmost columns
-        tensor[:, :, :, -self.padding :] = 0  # Rightmost columns
-        return tensor
-
-    def get(self, idx):
-        if self.dataset is not None:
-            img = self.dataset_get_fn(self.dataset[idx])
-
-        rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
-        patch_per_dim = self.patch_per_dim[rdim]
-
-        height = patch_per_dim[0] * self.patch_size
-        width = patch_per_dim[1] * self.patch_size
-
-        img = img.resize((width, height))  # , resample=Resampling.BICUBIC)
-
-        img = self.trans
-
-        forms(img)
-        xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
-
-        xy = einops.rearrange(xy, "x y c -> (x y) c")
-        patches = einops.rearrange(patches, "x y c k1 k2 -> (x y) c k1 k2")
-        if self.padding > 0:
-            patches = self.zero_margin(patches)
-        indexes = torch.arange(patch_per_dim[0] * patch_per_dim[1]).reshape(
-            xy.shape[:-1]
-        )
-        if self.degree == -1:
-            adj_mat = torch.ones(
-                patch_per_dim[0] * patch_per_dim[1], patch_per_dim[0] * patch_per_dim[1]
-            )
-
-            edge_index, _ = pyg.utils.dense_to_sparse(adj_mat)
-        else:
-            if not self.unique_graph:
-                edge_index = generate_random_expander(
-                    patch_per_dim[0] * patch_per_dim[1], self.degree
-                ).T
-        data = pyg_data.Data(
-            x=xy,
-            indexes=indexes,
-            patches=patches,
-            edge_index=(
-                self.edge_index[patch_per_dim] if self.unique_graph else edge_index
-            ),
-            ind_name=torch.tensor([idx]).long(),
-            patches_dim=torch.tensor([patch_per_dim]),
-        )
-        return data
-
-
-class Puzzle_Dataset_ROT_MP(Puzzle_Dataset):
-    def __init__(
-        self,
-        dataset=None,
-        dataset_get_fn=None,
-        patch_per_dim=[(7, 6)],
-        patch_size=32,
-        augment=False,
-        concat_rot=True,
-        missing_perc=10,
-    ) -> None:
-        super().__init__(
-            dataset=dataset,
-            dataset_get_fn=dataset_get_fn,
-            patch_per_dim=patch_per_dim,
-            patch_size=patch_size,
-            augment=augment,
-        )
-        self.concat_rot = concat_rot
-        self.missing_pieces_perc = missing_perc
-
-    def get(self, idx):
-        if self.dataset is not None:
-            img = self.dataset_get_fn(self.dataset[idx])
-
-        rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
-        patch_per_dim = self.patch_per_dim[rdim]
-
-        height = patch_per_dim[0] * self.patch_size
-        width = patch_per_dim[1] * self.patch_size
-
-        img = img.resize((width, height))  # , resample=Resampling.BICUBIC)
-
-        img = self.transforms(img)
-        xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
-
-        xy = einops.rearrange(xy, "x y c -> (x y) c")
-        patches = einops.rearrange(patches, "x y c k1 k2 -> (x y) c k1 k2")
-
-        patches_num = patches.shape[0]
-
-        patches_numpy = (
-            (patches * 255).long().numpy().transpose(0, 2, 3, 1).astype(np.uint8)
-        )
-        patches_im = [Image.fromarray(patches_numpy[x]) for x in range(patches_num)]
-        random_rot = torch.randint(low=0, high=4, size=(patches_num,))
-        random_rot_one_hot = torch.nn.functional.one_hot(random_rot, 4)
-
-        # rotation classes : 0 -> no rotation
-        #                   1 -> 90 degrees
-        #                   2 -> 180 degrees
-        #                   3 -> 270 degrees
-
-        indexes = torch.arange(patch_per_dim[0] * patch_per_dim[1]).reshape(
-            xy.shape[:-1]
-        )
-
-        rots = torch.tensor(
-            [
-                [1, 0],
-                [0, 1],
-                [-1, 0],
-                [0, -1],
-            ]
-        )
-
-        rots_tensor = random_rot_one_hot @ rots
-        rotated_patch = [
-            x.rotate(rot * 90) for (x, rot) in zip(patches_im, random_rot)
-        ]  # in PIL
-
-        rotated_patch_tensor = [
-            torch.tensor(np.array(patch)).permute(2, 0, 1).float() / 255
-            for patch in rotated_patch
-        ]
-
-        patches = torch.stack(rotated_patch_tensor)
-        if self.concat_rot:
-            xy = torch.cat([xy, rots_tensor], 1)
-
-        num_pieces = xy.shape[0]
-        pieces_to_remove = math.ceil(num_pieces * self.missing_pieces_perc / 100)
-
-        perm = list(range(num_pieces))
-
-        random.shuffle(perm)
-        perm = perm[: num_pieces - pieces_to_remove]
-        xy = xy[perm]
-        patches = patches[perm]
-
-        adj_mat = torch.ones(xy.shape[0], xy.shape[0])
-        edge_index, edge_attr = pyg.utils.dense_to_sparse(adj_mat)
-
-        data = pyg_data.Data(
-            x=xy,
-            indexes=indexes,
-            rot=rots_tensor,
-            rot_index=random_rot,
-            patches=patches,
-            edge_index=edge_index,
-            ind_name=torch.tensor([idx]).long(),
-            patches_dim=torch.tensor([patch_per_dim]),
-        )
-        return data
-
-
-class Puzzle_Dataset_MP(Puzzle_Dataset):
-    def __init__(
-        self,
-        dataset=None,
-        dataset_get_fn=None,
-        patch_per_dim=[(7, 6)],
-        patch_size=32,
-        missing_perc=10,
-        augment=False,
-    ) -> None:
-        super().__init__(
-            dataset=dataset,
-            dataset_get_fn=dataset_get_fn,
-            patch_per_dim=patch_per_dim,
-            patch_size=patch_size,
-            augment=augment,
-        )
-        self.missing_pieces_perc = missing_perc
-
-    def get(self, idx):
-        if self.dataset is not None:
-            img = self.dataset_get_fn(self.dataset[idx])
-
-        rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
-        patch_per_dim = self.patch_per_dim[rdim]
-
-        height = patch_per_dim[0] * self.patch_size
-        width = patch_per_dim[1] * self.patch_size
-
-        img = img.resize((width, height))  # , resample=Resampling.BICUBIC)
-
-        img = self.transforms(img)
-        xy, patches = divide_images_into_patches(img, patch_per_dim, self.patch_size)
-
-        xy = einops.rearrange(xy, "x y c -> (x y) c")
-        patches = einops.rearrange(patches, "x y c k1 k2 -> (x y) c k1 k2")
-
-        num_pieces = xy.shape[0]
-        pieces_to_remove = math.ceil(num_pieces * self.missing_pieces_perc / 100)
-
-        perm = list(range(num_pieces))
-
-        random.shuffle(perm)
-        perm = perm[: num_pieces - pieces_to_remove]
-        xy = xy[perm]
-        patches = patches[perm]
-
-        adj_mat = torch.ones(xy.shape[0], xy.shape[0])
-        edge_index, edge_attr = pyg.utils.dense_to_sparse(adj_mat)
-        data = pyg_data.Data(
-            x=xy,
-            patches=patches,
-            edge_index=edge_index,
-            ind_name=torch.tensor([idx]).long(),
-            patches_dim=torch.tensor([patch_per_dim]),
-        )
-        return data
-
-
 class Puzzle_Dataset_ROT(Puzzle_Dataset):
     def __init__(
         self,
         dataset=None,
-        dataset_get_fn=None,
         patch_per_dim=[(7, 6)],
         patch_size=32,
         augment=False,
@@ -567,7 +320,6 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset):
     ) -> None:
         super().__init__(
             dataset=dataset,
-            dataset_get_fn=dataset_get_fn,
             patch_per_dim=patch_per_dim,
             patch_size=patch_size,
             augment=augment,
@@ -586,7 +338,7 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset):
 
     def get(self, idx):
         if self.dataset is not None:
-            img = self.dataset_get_fn(self.dataset[idx])
+            img = self.dataset[idx]
 
         rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
         patch_per_dim = self.patch_per_dim[rdim]
@@ -713,9 +465,7 @@ if __name__ == "__main__":
     from celeba_dt import CelebA_HQ
 
     train_dt = CelebA_HQ(train=True)
-    dt = Puzzle_Dataset_ROT(
-        train_dt, dataset_get_fn=lambda x: x[0], patch_per_dim=[(4, 4)]
-    )
+    dt = Puzzle_Dataset_ROT(train_dt, patch_per_dim=[(4, 4)])
 
     dl = torch_geometric.loader.DataLoader(dt, batch_size=100)
     dl_iter = iter(dl)
