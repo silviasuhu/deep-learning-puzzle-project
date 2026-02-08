@@ -1,3 +1,14 @@
+"""
+This file contains the implementation of the Puzzle_Dataset class, which is a PyTorch Geometric
+dataset for creating puzzle-like graph data from images. The dataset divides images into patches and
+constructs a graph where each patch is a node and edges are defined based on a specified degree of
+connectivity. The dataset also supports various augmentations, including random rotations and
+missing pieces, to create more challenging puzzles for training graph neural networks.
+
+Note: This file has been sourced from the following file in the DiffAssemble repository:
+(https://github.com/IIT-PAVIS/DiffAssemble/blob/release/puzzle_diff/dataset/puzzle_dataset.py)
+"""
+
 import math
 import random
 from typing import List, Tuple

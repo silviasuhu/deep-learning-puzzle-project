@@ -67,12 +67,18 @@ class CelebA_DataSet(torch.utils.data.Dataset):
     No patches. No graphs. No diffusion logic.
     """
 
-    def __init__(self, images_path, txt_path, transform=None):
-        self.images_path = images_path
-        self.transform = transform
+    def __init__(self, train=True, transform=None):
+        self.images_path = "data/CelebA-HQ/images/CelebAMask-HQ/CelebA-HQ-img/"
+        if train:
+            txt_path = "data/CelebA-HQ/CelebA-HQ_train.txt"
+        else:
+            txt_path = "data/CelebA-HQ/CelebA-HQ_test.txt"
 
+        self.image_names = []
         with open(txt_path, "r", encoding="utf-8") as f:
             self.image_names = f.read().splitlines()
+
+        self.transform = transform
 
     def __len__(self):
         return len(self.image_names)
@@ -190,10 +196,7 @@ class CelebA_Graph_Dataset(torch_geometric.data.Dataset):
 
 
 if __name__ == "__main__":
-    dataset = CelebA_DataSet(
-        images_path="data/CelebA-HQ/images/CelebAMask-HQ/CelebA-HQ-img/",
-        txt_path="data/CelebA-HQ/CelebA-HQ_test.txt",
-    )
+    dataset = CelebA_DataSet(train=True)  # or False for test set
 
     print(f"Dataset size: {len(dataset)}")
 

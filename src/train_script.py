@@ -36,20 +36,8 @@ def main(batch_size, steps, epochs, puzzle_sizes):
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    # dataset = CelebA_Graph_Dataset(
-    #     dataset=CelebA_DataSet(
-    #         images_path="data/CelebA-HQ/images/CelebAMask-HQ/CelebA-HQ-img/",
-    #         txt_path="data/CelebA-HQ/CelebA-HQ_train.txt",
-    #     ),
-    #     num_patches_x=patch_size_x,
-    #     num_patches_y=patch_size_y,
-    # )
-
     dataset = Puzzle_Dataset(
-        dataset=CelebA_DataSet(
-            images_path="data/CelebA-HQ/images/CelebAMask-HQ/CelebA-HQ-img/",
-            txt_path="data/CelebA-HQ/CelebA-HQ_train.txt",
-        ),
+        dataset=CelebA_DataSet(train=True),
         patch_per_dim=[(x, x) for x in puzzle_sizes],
         augment=False,
         degree=-1,
