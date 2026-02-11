@@ -212,3 +212,7 @@ __marimo__/
 # Downloaded images
 data/CelebA-HQ/images/*
 outputs
+
+# Training results (checkpoints are so large that we can't upload them to Github)
+checkpoints
+wandb

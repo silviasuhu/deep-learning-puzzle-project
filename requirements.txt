@@ -10,3 +10,4 @@ scipy
 argparse
 timm # for pre-trained models
 matplotlib # for notebook visualization
+wandb
