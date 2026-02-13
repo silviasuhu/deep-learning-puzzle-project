@@ -289,13 +289,13 @@ def _get_augmentation(augmentation_type: str = "none"):
 
 #General CelebA dataset class, only grabs images, DOES NOT convert to tensor or create graph
 class CelebA_HQ(Dataset):
-    def __init__(self, train=True) -> None:
+    def __init__(self, dataset_path, train=True) -> None:
         super().__init__()
         all_images = set(
-            list(Path("datasets/CelebAMask-HQ/CelebA-HQ-img").glob("*.jpg"))
+            list(Path(f"{dataset_path}/CelebA-HQ-img").glob("*.jpg"))
         )
-        train_file = Path("datasets/data_splits/CelebA-HQ_train.txt")
-        test_file = Path("datasets/data_splits/CelebA-HQ_test.txt")
+        train_file = Path(f"{dataset_path}/CelebA-HQ_train.txt")
+        test_file = Path(f"{dataset_path}/CelebA-HQ_test.txt")
 
         with open(train_file, "r") as f:
             train_images_set = set([x.rstrip() for x in f.readlines()])
@@ -311,7 +311,7 @@ class CelebA_HQ(Dataset):
         return len(self.images)
 
     def __getitem__(self, index):
-        return Image.open(self.images[index]), None
+        return Image.open(self.images[index])
 
 # General Puzzle dataset class
 class Puzzle_Dataset(pyg_data.Dataset):
