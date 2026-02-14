@@ -297,7 +297,7 @@ class CelebA_HQ(Dataset):
 
     def __init__(self, dataset_path, train=True):
         super().__init__()
-        self.images_path = f"{dataset_path}/CelebAMask-HQ/CelebA-HQ-img/"
+        self.images_path = f"{dataset_path}/CelebA-HQ-img/"
         if train:
             txt_path = f"{dataset_path}/CelebA-HQ_train.txt"
         else:
