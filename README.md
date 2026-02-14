@@ -79,9 +79,9 @@ Follow these steps to decompress and place the dataset in this repository:
 
 ```
 cd <root_directory_of_this_repository>
-mkdir -p data/CelebA-HQ/images
-mv ~/Downloads/CelebAMask-HQ.zip data/CelebA-HQ/images/.
-unzip data/CelebA-HQ/images/CelebAMask-HQ.zip -d data/CelebA-HQ/images
+mkdir -p data/CelebA-HQ
+mv ~/Downloads/CelebAMask-HQ.zip data/CelebA-HQ/.
+unzip data/CelebA-HQ/CelebAMask-HQ.zip -d data/CelebA-HQ
 ```
 
 After extraction, ensure that the dataset files are correctly placed under

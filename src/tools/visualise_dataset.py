@@ -17,7 +17,7 @@ from dataset_celeb_rot import CelebA_DataSet, CelebA_Graph_Dataset
 out_dir = str(PROJECT_ROOT / "outputs")
 os.makedirs(out_dir, exist_ok=True)
 
-images_path = str(PROJECT_ROOT / "data/CelebA-HQ/images/CelebAMask-HQ/CelebA-HQ-img/")
+images_path = str(PROJECT_ROOT / "data/CelebA-HQ/CelebAMask-HQ/CelebA-HQ-img/")
 txt_path = str(PROJECT_ROOT / "data/CelebA-HQ/CelebA-HQ_train.txt")
 
 dataset = CelebA_DataSet(images_path=images_path, txt_path=txt_path)

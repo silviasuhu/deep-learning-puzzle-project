@@ -210,7 +210,7 @@ __marimo__/
 .vscode/settings.json
 
 # Downloaded images
-data/CelebA-HQ/images/*
+data/CelebA-HQ
 outputs
 
 # Training results (checkpoints are so large that we can't upload them to Github)

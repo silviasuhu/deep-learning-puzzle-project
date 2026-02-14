@@ -68,7 +68,7 @@ class CelebA_DataSet(torch.utils.data.Dataset):
     """
 
     def __init__(self, train=True, transform=None):
-        self.images_path = "data/CelebA-HQ/images/CelebAMask-HQ/CelebA-HQ-img/"
+        self.images_path = "data/CelebA-HQ/CelebAMask-HQ/CelebA-HQ-img/"
         if train:
             txt_path = "data/CelebA-HQ/CelebA-HQ_train.txt"
         else:
