@@ -4,6 +4,7 @@ from PIL import Image
 from PIL.Image import Resampling
 from torch.utils.data import Dataset
 
+import os
 import math
 import random
 from typing import List, Tuple
@@ -289,36 +290,36 @@ def _get_augmentation(augmentation_type: str = "none"):
 
 #General CelebA dataset class, only grabs images, DOES NOT convert to tensor or create graph
 class CelebA_HQ(Dataset):
-    def __init__(self, dataset_path, train=True) -> None:
-        super().__init__()
-        all_images = set(
-            list(Path(f"{dataset_path}/CelebA-HQ-img").glob("*.jpg"))
-        )
-        train_file = Path(f"{dataset_path}/CelebA-HQ_train.txt")
-        test_file = Path(f"{dataset_path}/CelebA-HQ_test.txt")
+    """
+    ONLY loads images.
+    No patches. No graphs. No diffusion logic.
+    """
 
-        with open(train_file, "r") as f:
-            train_images_set = set([x.rstrip() for x in f.readlines()])
-        with open(test_file, "r") as f:
-            test_images_set = set([x.rstrip() for x in f.readlines()])
+    def __init__(self, dataset_path, train=True):
+        super().__init__()
+        self.images_path = f"{dataset_path}/CelebAMask-HQ/CelebA-HQ-img/"
         if train:
-            self.images = [img for img in all_images if img.name in train_images_set]
+            txt_path = f"{dataset_path}/CelebA-HQ_train.txt"
         else:
-            self.images = [img for img in all_images if img.name in test_images_set]
-        self.images = sorted(self.images)
+            txt_path = f"{dataset_path}/CelebA-HQ_test.txt"
+
+        self.image_names = []
+        with open(txt_path, "r", encoding="utf-8") as f:
+            self.image_names = f.read().splitlines()
+
 
     def __len__(self):
-        return len(self.images)
+        return len(self.image_names)
 
-    def __getitem__(self, index):
-        return Image.open(self.images[index])
+    def __getitem__(self, idx):
+        return Image.open(os.path.join(self.images_path, self.image_names[idx]))
+
 
 # General Puzzle dataset class
 class Puzzle_Dataset(pyg_data.Dataset):
     def __init__(
         self,
         dataset=None, #Underlying dataset (eg: CelebA_HQ)
-        dataset_get_fn=None, #Function to get the image from the dataset (for this method: "lambda x: x[0] for CelebA_HQ")
         patch_per_dim=[(7, 6)], #Patch sizes (eg: [(7,6)])
         patch_size=32,  # Size of each patch in pixels
         augment="", #Agumentation type ("" for none, "weak" or "hard")
@@ -328,9 +329,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
     ) -> None:
         super().__init__()
 
-        assert dataset is not None and dataset_get_fn is not None
         self.dataset = dataset
-        self.dataset_get_fn = dataset_get_fn
         self.patch_per_dim = patch_per_dim
         self.unique_graph = unique_graph
         self.augment = augment
@@ -362,7 +361,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
     # Core function of the class: gets the image, divides into patches, creates the graph and returns the data object
     def get(self, idx): #Only input is the index of the image in the dataset
         if self.dataset is not None: # Ofc, only if the dataset is provided
-            img = self.dataset_get_fn(self.dataset[idx]) # Get the image given the provided dataset_get_fn function ("lambda x: x[0] for CelebA_HQ")
+            img = self.dataset[idx]
 
         #Picks a random patch dimension from the list provided (if only provided 1, it will always be the same)
         rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item() # 
@@ -421,7 +420,6 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset): # Constructed on top of Puzzle_Dataset
     def __init__(
         self,
         dataset=None,
-        dataset_get_fn=None,
         patch_per_dim=[(7, 6)],
         patch_size=32,
         augment=False,
@@ -433,7 +431,6 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset): # Constructed on top of Puzzle_Dataset
     ) -> None:
         super().__init__(
             dataset=dataset,
-            dataset_get_fn=dataset_get_fn,
             patch_per_dim=patch_per_dim,
             patch_size=patch_size,
             augment=augment,
@@ -454,7 +451,7 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset): # Constructed on top of Puzzle_Dataset
     def get(self, idx):
         # Get image with provided function
         if self.dataset is not None:
-            img = self.dataset_get_fn(self.dataset[idx])
+            img = self.dataset[idx]
 
         # All this are the same than the Puzzle_Dataset
         rdim = torch.randint(len(self.patch_per_dim), size=(1,)).item()
