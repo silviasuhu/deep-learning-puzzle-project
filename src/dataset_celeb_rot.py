@@ -67,12 +67,12 @@ class CelebA_DataSet(torch.utils.data.Dataset):
     No patches. No graphs. No diffusion logic.
     """
 
-    def __init__(self, train=True, transform=None):
-        self.images_path = "data/CelebA-HQ/CelebAMask-HQ/CelebA-HQ-img/"
+    def __init__(self, path="data/CelebA-HQ", train=True, transform=None):
+        self.images_path = f"{path}/CelebAMask-HQ/CelebA-HQ-img/"
         if train:
-            txt_path = "data/CelebA-HQ/CelebA-HQ_train.txt"
+            txt_path = f"{path}/CelebA-HQ_train.txt"
         else:
-            txt_path = "data/CelebA-HQ/CelebA-HQ_test.txt"
+            txt_path = f"{path}/CelebA-HQ_test.txt"
 
         self.image_names = []
         with open(txt_path, "r", encoding="utf-8") as f:
