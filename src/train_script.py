@@ -131,7 +131,15 @@ def main(
         #   ---- CHECKPOINT ----
         if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
             checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
-            torch.save(model.state_dict(), checkpoint_path)
+
+            checkpoint = {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "steps": steps,
+                "loss": val_loss,
+            }
+
+            torch.save(checkpoint, checkpoint_path)
             print(f"Saved checkpoint: {checkpoint_path}")
 
 
