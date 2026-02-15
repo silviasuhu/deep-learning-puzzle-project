@@ -13,7 +13,9 @@ from torch.utils.data import random_split
 import wandb
 
 
-def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
+def main(
+    batch_size: int, steps: int, epochs: int, puzzle_sizes: list, wandb_disabled: bool
+):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -34,19 +36,23 @@ def main(batch_size: int, steps: int, epochs: int, puzzle_sizes: list):
     patch_per_dim = [(x, x) for x in puzzle_sizes]
 
     # Start a new wandb run to track this script.
-    run = wandb.init(
-        entity="postgraduate-project-puzzle-upc",
-        project="my-awesome-project",
-        # Track hyperparameters and run metadata.
-        config={
-            "batch_size": batch_size,
-            "steps": steps,
-            "epochs": epochs,
-            "patch_per_dim": patch_per_dim,
-            "model": "Eff_gat",
-            "optimizer": "Adafactor",
-            "loss": "smooth_l1",
-        },
+    run = (
+        wandb.init(
+            entity="postgraduate-project-puzzle-upc",
+            project="my-awesome-project",
+            # Track hyperparameters and run metadata.
+            config={
+                "batch_size": batch_size,
+                "steps": steps,
+                "epochs": epochs,
+                "patch_per_dim": patch_per_dim,
+                "model": "Eff_gat",
+                "optimizer": "Adafactor",
+                "loss": "smooth_l1",
+            },
+        )
+        if not wandb_disabled
+        else wandb.init(mode="offline")
     )
 
     train_dt = CelebA_DataSet(train=True)
@@ -136,6 +142,7 @@ if __name__ == "__main__":
     ap.add_argument("-batch_size", type=int, default=6)
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-epochs", type=int, default=1)
+    ap.add_argument("-wandb_disabled", action="store_true")
     ap.add_argument(
         "-puzzle_sizes",
         nargs="+",
@@ -146,4 +153,11 @@ if __name__ == "__main__":
 
     args = ap.parse_args()
     print(args)
-    main(args.batch_size, args.steps, args.epochs, args.puzzle_sizes)
+
+    main(
+        batch_size=args.batch_size,
+        steps=args.steps,
+        epochs=args.epochs,
+        puzzle_sizes=args.puzzle_sizes,
+        wandb_disabled=args.wandb_disabled,
+    )

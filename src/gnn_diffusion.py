@@ -19,7 +19,7 @@ class GNN_Diffusion:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # calculations for diffusion q(x_t | x_{t-1}) and others
-        betas = linear_beta_schedule(timesteps=steps)
+        betas = linear_beta_schedule(timesteps=steps).to(self.device)
         alphas = 1.0 - betas
         alphas_cumprod = torch.cumprod(alphas, axis=0)
         self.sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
