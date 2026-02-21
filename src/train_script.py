@@ -12,6 +12,8 @@ from model.efficient_gat import Eff_GAT
 from torch.utils.data import random_split
 import wandb
 
+from datetime import datetime
+
 
 def main(
     batch_size: int, steps: int, epochs: int, puzzle_sizes: list, wandb_disabled: bool
@@ -34,12 +36,14 @@ def main(
     # Create a list of tuples containing the actual puzzle sizes
     # If puzzles_sizes is [2, 4, 7], then patch_per_dim will be [(2, 2), (4, 4), (7, 7)]
     patch_per_dim = [(x, x) for x in puzzle_sizes]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Start a new wandb run to track this script.
     run = (
         wandb.init(
             entity="postgraduate-project-puzzle-upc",
-            project="my-awesome-project",
+            project="Puzzle Diffusion_GNN",
+            name=f"{timestamp}_Puzzle{puzzle_sizes}_steps{steps}_bs{batch_size}",
             # Track hyperparameters and run metadata.
             config={
                 "batch_size": batch_size,
@@ -148,7 +152,25 @@ def main(
         #   ---- CHECKPOINT ----
         if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
             checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
-            torch.save(model.state_dict(), checkpoint_path)
+
+            checkpoint = {
+                "epoch": epoch + 1,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "config": {
+                    "steps": steps,
+                    "batch_size": batch_size,
+                    "puzzle_sizes": puzzle_sizes,
+                },
+                "metrics": {
+                    "val_loss": val_loss_mean,
+                    "val_pos_error": val_pos_mean,
+                    "val_rot_error": val_rot_mean,
+                    "val_accuracy": val_acc_mean,
+                },
+            }
+
+            torch.save(checkpoint, checkpoint_path)
             print(f"Saved checkpoint: {checkpoint_path}")
     run.finish()
 
