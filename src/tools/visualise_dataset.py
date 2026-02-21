@@ -12,7 +12,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from dataset_celeb_rot import CelebA_DataSet, CelebA_Graph_Dataset
+from dataset_celeb import CelebA_DataSet, CelebA_Graph_Dataset
 
 out_dir = str(PROJECT_ROOT / "outputs")
 os.makedirs(out_dir, exist_ok=True)
