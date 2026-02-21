@@ -43,7 +43,8 @@ def main(
     run = (
         wandb.init(
             entity="postgraduate-project-puzzle-upc",
-            project="Puzzle Diffusion_GNN",
+            # project="Puzzle Diffusion_GNN",
+            project="my-awesome-project",
             name=f"{timestamp}_Puzzle{puzzle_sizes}_steps{steps}_bs{batch_size}",
             # Track hyperparameters and run metadata.
             config={
@@ -112,7 +113,9 @@ def main(
         val_loss = []
         val_pos = []
         val_rot = []
-        val_acc = []
+        val_acc_pos = []
+        val_rot_acc = []
+        # val_strict_acc = []
 
         # disable gradient tracking (save memory,prevents accidental backprop)
         with torch.no_grad():
@@ -121,12 +124,16 @@ def main(
                 val_loss.append(val_metrics["loss"].item())
                 val_pos.append(val_metrics["pos_error"].item())
                 val_rot.append(val_metrics["rot_error"].item())
-                val_acc.append(val_metrics["accuracy"].item())
+                val_acc_pos.append(val_metrics["pos_accuracy"].item())
+                val_rot_acc.append(val_metrics["rot_accuracy"].item())
+                # val_strict_acc.append(val_metrics["strict_accuracy"].item())
 
         val_loss_mean = np.mean(val_loss)
         val_pos_mean = np.mean(val_pos)
         val_rot_mean = np.mean(val_rot)
-        val_acc_mean = np.mean(val_acc)
+        val_acc_pos_mean = np.mean(val_acc_pos)
+        val_rot_acc_mean = np.mean(val_rot_acc)
+        # val_strict_acc_mean = np.mean(val_strict_acc)
 
         # -------- LOGGING --------
         run.log(
@@ -137,7 +144,9 @@ def main(
                 "val/pos_error": val_pos_mean,
                 "val/rot_error_rad": val_rot_mean,
                 "val/rot_error_deg": val_rot_mean * 180.0 / np.pi,
-                "val/accuracy": val_acc_mean,
+                "val/pos_accuracy": val_acc_pos_mean,
+                "val/rot_accuracy": val_rot_acc_mean,
+                # "val/strict_accuracy": val_strict_acc_mean,
             }
         )
 
@@ -147,9 +156,10 @@ def main(
             f"Val Loss: {val_loss_mean:.4f} | "
             f"Pos Err: {val_pos_mean:.4f} | "
             f"Rot Err: {val_rot_mean * 180.0 / np.pi:.2f} deg | "
-            f"Accuracy: {val_acc_mean:.4f}"
+            f"Pos Accuracy: {val_acc_pos_mean:.4f} | "
+            f"Rot Accuracy: {val_rot_acc_mean:.4f} | "
         )
-
+        # f"Strict Accuracy: {val_strict_acc_mean:.4f}"
         #   ---- CHECKPOINT ----
         if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
             checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
@@ -167,7 +177,9 @@ def main(
                     "val_loss": val_loss_mean,
                     "val_pos_error": val_pos_mean,
                     "val_rot_error": val_rot_mean,
-                    "val_accuracy": val_acc_mean,
+                    "val_pos_accuracy": val_acc_pos_mean,
+                    "val_rot_accuracy": val_rot_acc_mean,
+                    # "val_strict_accuracy": val_strict_acc_mean,
                 },
             }
 

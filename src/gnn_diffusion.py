@@ -40,9 +40,33 @@ def rotation_error(pred_rot, gt_rot):
     return angle.mean()
 
 
-def piece_accuracy(pred_pos, gt_pos, thresh=0.05):
+def piece_position_accuracy(pred_pos, gt_pos, thresh=0.05):
     dist = torch.norm(pred_pos - gt_pos, dim=-1)
     return (dist < thresh).float().mean()
+
+
+def piece_rotation_accuracy(pred_rot, gt_rot, rot_thresh_deg=10):
+    rot_diff = torch.atan2(
+        torch.sin(pred_rot - gt_rot), torch.cos(pred_rot - gt_rot)
+    ).abs()
+
+    rot_ok = rot_diff < torch.deg2rad(torch.tensor(rot_thresh_deg))
+    return rot_ok.float().mean()
+
+
+def strict_piece_accuracy(
+    pred_pos, gt_pos, pred_rot, gt_rot, pos_thresh=0.05, rot_thresh_deg=10
+):
+
+    pos_ok = torch.norm(pred_pos - gt_pos, dim=-1) < pos_thresh
+
+    rot_diff = torch.atan2(
+        torch.sin(pred_rot - gt_rot), torch.cos(pred_rot - gt_rot)
+    ).abs()
+
+    rot_ok = rot_diff < torch.deg2rad(torch.tensor(rot_thresh_deg))
+
+    return (pos_ok & rot_ok).float().mean()
 
 
 class GNN_Diffusion:
@@ -152,11 +176,15 @@ class GNN_Diffusion:
 
         pos_err = position_error(pred_pos, gt_pos)
         rot_err = rotation_error(pred_rot, gt_rot)
-        acc = piece_accuracy(pred_pos, gt_pos)
+        acc_pos = piece_position_accuracy(pred_pos, gt_pos)
+        acc_rot = piece_rotation_accuracy(pred_rot, gt_rot)
+        # acc_strict = strict_piece_accuracy(pred_pos, gt_pos, pred_rot, gt_rot)
 
         return {
             "loss": val_loss.detach(),
             "pos_error": pos_err.detach(),
             "rot_error": rot_err.detach(),
-            "accuracy": acc.detach(),
+            "pos_accuracy": acc_pos.detach(),
+            "rot_accuracy": acc_rot.detach(),
+            # "strict_accuracy": acc_strict.detach(),
         }
