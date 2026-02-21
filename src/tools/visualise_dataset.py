@@ -12,7 +12,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from dataset_celeb import CelebA_DataSet, CelebA_Graph_Dataset
+from dataset_celeb import CelebA_DataSet
+from puzzle_dataset import Puzzle_Dataset_ROT
 
 out_dir = str(PROJECT_ROOT / "outputs")
 os.makedirs(out_dir, exist_ok=True)
@@ -29,17 +30,15 @@ orig_path = os.path.join(out_dir, f"sample_{idx}_orig.png")
 img.save(orig_path)
 
 # Build graph and make a shuffled puzzle image
-graph_ds = CelebA_Graph_Dataset(
-    dataset, num_patches_x=10, num_patches_y=10, image_size=192
-)
+graph_ds = Puzzle_Dataset_ROT(dataset=dataset, patch_per_dim=[(10, 10)])
 # Use same index to relate to the same image
 graph = graph_ds.get(idx)
 
 patches = graph.patches  # [N, C, ph, pw]
 N, C, ph, pw = patches.shape
 
-grid_h = graph_ds.num_patches_y
-grid_w = graph_ds.num_patches_x
+grid_h = graph_ds.patch_per_dim[0][0]
+grid_w = graph_ds.patch_per_dim[0][1]
 
 # Build a grid in the shuffled order (puzzle)
 patches_grid = patches.view(grid_h, grid_w, C, ph, pw)
