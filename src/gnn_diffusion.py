@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 
 def extract(a, t):
@@ -10,6 +11,38 @@ def linear_beta_schedule(timesteps):
     beta_start = 0.0001
     beta_end = 0.02
     return torch.linspace(beta_start, beta_end, timesteps)
+
+
+# Geometry helpers (EXTRA metrics for evaluation)
+def predict_x0(x_t, t, pred_noise, sqrt_alphas_cumprod, sqrt_one_minus_alphas_cumprod):
+    sqrt_alphas_cumprod_t = extract(sqrt_alphas_cumprod, t)
+    sqrt_one_minus_alphas_cumprod_t = extract(sqrt_one_minus_alphas_cumprod, t)
+    return (x_t - sqrt_one_minus_alphas_cumprod_t * pred_noise) / sqrt_alphas_cumprod_t
+
+
+def split_pose(x):
+    # Assumes node features = [tx, ty, cosθ, sinθ]
+    pos = x[:, 0:2]
+    rot = x[:, 2:4]
+    return pos, rot
+
+
+def position_error(pred_pos, gt_pos):
+    return torch.norm(pred_pos - gt_pos, dim=-1).mean()
+
+
+def rotation_error(pred_rot, gt_rot):
+    pred_rot = F.normalize(pred_rot, dim=-1)
+    gt_rot = F.normalize(gt_rot, dim=-1)
+
+    dot = (pred_rot * gt_rot).sum(dim=-1).clamp(-1.0, 1.0)
+    angle = torch.acos(dot)  # radians
+    return angle.mean()
+
+
+def piece_accuracy(pred_pos, gt_pos, thresh=0.05):
+    dist = torch.norm(pred_pos - gt_pos, dim=-1)
+    return (dist < thresh).float().mean()
 
 
 class GNN_Diffusion:
@@ -35,7 +68,6 @@ class GNN_Diffusion:
         return sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
 
     def training_step(self, batch, model, criterion, optimizer):
-        print("Start training_step")
 
         optimizer.zero_grad()
 
@@ -56,21 +88,21 @@ class GNN_Diffusion:
         noise = torch.randn_like(x_start)
 
         # Compute x_noisy
-        print("Compute x_noisy")
+
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
         # Compute patch_feats
-        print("Compute patch_feats")
+
         patch_feats = model.visual_features(batch.patches)
 
         # Compute prediction
-        print("Compute prediction")
+
         prediction, attentions = model.forward_with_feats(
             x_noisy, t, batch.patches, batch.edge_index, patch_feats, batch.batch
         )
 
         # Compute loss
-        print("Compute loss")
+
         target = noise
         loss = criterion(target, prediction)
 
@@ -104,4 +136,27 @@ class GNN_Diffusion:
         # Prediction = model's noise estimate
         val_loss = criterion(noise, prediction)
         # Store scalar loss
-        return val_loss
+
+        # new metrics for evaluation
+        # ---- reconstruct predicted clean pose ----
+        x0_pred = predict_x0(
+            x_noisy,
+            t,
+            prediction,
+            self.sqrt_alphas_cumprod,
+            self.sqrt_one_minus_alphas_cumprod,
+        )
+
+        gt_pos, gt_rot = split_pose(x_start)
+        pred_pos, pred_rot = split_pose(x0_pred)
+
+        pos_err = position_error(pred_pos, gt_pos)
+        rot_err = rotation_error(pred_rot, gt_rot)
+        acc = piece_accuracy(pred_pos, gt_pos)
+
+        return {
+            "loss": val_loss.detach(),
+            "pos_error": pos_err.detach(),
+            "rot_error": rot_err.detach(),
+            "accuracy": acc.detach(),
+        }

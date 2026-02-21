@@ -89,8 +89,11 @@ def main(
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(epochs):
+
+        # -------- TRAIN --------
         model.train()
         train_losses = []
+
         for batch in train_loader:
             batch = batch.to(device)
             loss = gnn_diffusion.training_step(batch, model, criterion, optimizer)
@@ -101,38 +104,53 @@ def main(
         # VALIDATION
         # switch model to evaluation mode
         model.eval()
-        val_losses = []
+        val_loss = []
+        val_pos = []
+        val_rot = []
+        val_acc = []
 
         # disable gradient tracking (save memory,prevents accidental backprop)
         with torch.no_grad():
             for batch in val_loader:
-                val_loss = gnn_diffusion.validation_step(batch, model, criterion)
-                val_losses.append(val_loss.item())
+                val_metrics = gnn_diffusion.validation_step(batch, model, criterion)
+                val_loss.append(val_metrics["loss"].item())
+                val_pos.append(val_metrics["pos_error"].item())
+                val_rot.append(val_metrics["rot_error"].item())
+                val_acc.append(val_metrics["accuracy"].item())
 
-        val_loss_mean = np.mean(val_losses)
+        val_loss_mean = np.mean(val_loss)
+        val_pos_mean = np.mean(val_pos)
+        val_rot_mean = np.mean(val_rot)
+        val_acc_mean = np.mean(val_acc)
+
         # -------- LOGGING --------
         run.log(
-            {"epoch": epoch + 1, "train/loss": train_loss, "val/loss": val_loss_mean}
+            {
+                "epoch": epoch + 1,
+                "train/loss": train_loss,
+                "val/loss": val_loss_mean,
+                "val/pos_error": val_pos_mean,
+                "val/rot_error_rad": val_rot_mean,
+                "val/rot_error_deg": val_rot_mean * 180.0 / np.pi,
+                "val/accuracy": val_acc_mean,
+            }
         )
 
         print(
             f"Epoch [{epoch+1}/{epochs}] "
-            f"Train Loss: {train_loss:.4f} "
-            f"Val Loss: {val_loss:.4f}"
+            f"Train Loss: {train_loss:.4f} | "
+            f"Val Loss: {val_loss_mean:.4f} | "
+            f"Pos Err: {val_pos_mean:.4f} | "
+            f"Rot Err: {val_rot_mean * 180.0 / np.pi:.2f} deg | "
+            f"Accuracy: {val_acc_mean:.4f}"
         )
-        run.log({"train/loss": train_loss, "epoch": epoch + 1})
-        run.finish()
 
-        print(
-            f"Epoch [{epoch+1}/{epochs}] "
-            f"Train Loss: {train_loss:.4f} "
-            f"Val Loss: {val_loss:.4f}"
-        )
         #   ---- CHECKPOINT ----
         if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
             checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
             torch.save(model.state_dict(), checkpoint_path)
             print(f"Saved checkpoint: {checkpoint_path}")
+    run.finish()
 
 
 if __name__ == "__main__":
