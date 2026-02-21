@@ -18,6 +18,7 @@ from datetime import datetime
 def main(
     batch_size: int, steps: int, epochs: int, puzzle_sizes: list, wandb_disabled: bool
 ):
+    print(f"Cuda is available: {torch.cuda.is_available()}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
