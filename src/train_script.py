@@ -43,8 +43,8 @@ def main(
     run = (
         wandb.init(
             entity="postgraduate-project-puzzle-upc",
-            # project="Puzzle Diffusion_GNN",
-            project="my-awesome-project",
+            project="Puzzle Diffusion_GNN",
+            # project="my-awesome-project",
             name=f"{timestamp}_Puzzle{puzzle_sizes}_steps{steps}_bs{batch_size}",
             # Track hyperparameters and run metadata.
             config={

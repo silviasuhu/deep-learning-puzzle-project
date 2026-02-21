@@ -254,8 +254,8 @@ class Puzzle_Dataset(pyg_data.Dataset):
 
     def len(self) -> int:
         if self.dataset is not None:
-            # return len(self.dataset)
-            return 100
+            return len(self.dataset)
+            # return 100
         else:
             raise Exception("Dataset not provided")
 
