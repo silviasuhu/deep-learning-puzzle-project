@@ -11,3 +11,4 @@ argparse
 timm # for pre-trained models
 matplotlib # for notebook visualization
 wandb
+nbstripout # for stripping output from notebooks before committing to git
