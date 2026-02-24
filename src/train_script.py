@@ -23,9 +23,9 @@ def main(
     wandb_disabled: bool,
     checkpoint_path: str,
     wandb_project: str,
-    visual_model: str, 
-    gnn_model: str, 
-    degree: int
+    visual_model: str,
+    gnn_model: str,
+    degree: int,
 ):
     print(f"Cuda is available: {torch.cuda.is_available()}")
 
@@ -45,7 +45,7 @@ def main(
             output_channels=4,
             n_layers=4,
             model=visual_model,
-            architecture=gnn_model
+            architecture=gnn_model,
         )
         model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -59,7 +59,7 @@ def main(
             output_channels=4,
             n_layers=4,
             model=visual_model,
-            architecture=gnn_model
+            architecture=gnn_model,
         )
         optimizer = Adafactor(model.parameters())
 
@@ -243,9 +243,12 @@ if __name__ == "__main__":
     )
     ap.add_argument("-visual_model", type=str, default="resnet18equiv")
     ap.add_argument("-gnn_model", type=str, default="transformer")
-    ap.add_argument("-degree", type=int, default=-1,
-                    help="Degree of the expander graph. -1 = fully connected")
-    
+    ap.add_argument(
+        "-degree",
+        type=int,
+        default=-1,
+        help="Degree of the expander graph. -1 = fully connected",
+    )
 
     args = ap.parse_args()
     print(args)
@@ -259,6 +262,6 @@ if __name__ == "__main__":
         wandb_project=args.wandb_project,
         visual_model=args.visual_model,
         gnn_model=args.gnn_model,
-        degree=args.degree
+        degree=args.degree,
         checkpoint_path=args.checkpoint_path,
     )
