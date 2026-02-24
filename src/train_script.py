@@ -16,23 +16,50 @@ from datetime import datetime
 
 
 def main(
-    batch_size: int, steps: int, epochs: int, puzzle_sizes: list, wandb_disabled: bool
+    batch_size: int,
+    steps: int,
+    epochs: int,
+    puzzle_sizes: list,
+    wandb_disabled: bool,
+    checkpoint_path: str,
 ):
     print(f"Cuda is available: {torch.cuda.is_available()}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = Eff_GAT(
-        steps=steps,
-        input_channels=4,
-        output_channels=4,
-        n_layers=4,
-        model="resnet18equiv",
-    )
+    epoch_offset = 0
+    if checkpoint_path:
+        checkpoint = torch.load(checkpoint_path, weights_only=False)
+
+        epoch_offset = checkpoint["epoch"]
+        steps = checkpoint["config"]["steps"]
+        puzzle_sizes = checkpoint["config"]["puzzle_sizes"]
+
+        model = Eff_GAT(
+            steps=steps,
+            input_channels=4,
+            output_channels=4,
+            n_layers=4,
+            model="resnet18equiv",
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+
+        optimizer = Adafactor(model.parameters())
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+    else:
+        model = Eff_GAT(
+            steps=steps,
+            input_channels=4,
+            output_channels=4,
+            n_layers=4,
+            model="resnet18equiv",
+        )
+        optimizer = Adafactor(model.parameters())
+
     model.to(device)
 
     criterion = torch.nn.functional.smooth_l1_loss
-    optimizer = Adafactor(model.parameters())
 
     # Create a list of tuples containing the actual puzzle sizes
     # If puzzles_sizes is [2, 4, 7], then patch_per_dim will be [(2, 2), (4, 4), (7, 7)]
@@ -51,10 +78,12 @@ def main(
                 "batch_size": batch_size,
                 "steps": steps,
                 "epochs": epochs,
-                "patch_per_dim": patch_per_dim,
+                "epoch_offset": epoch_offset,
+                "puzzle_sizes": puzzle_sizes,
                 "model": "Eff_gat",
                 "optimizer": "Adafactor",
                 "loss": "smooth_l1",
+                "checkpoint_path": checkpoint_path,
             },
         )
         if not wandb_disabled
@@ -94,7 +123,8 @@ def main(
     checkpoint_dir = Path("outputs") / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    for epoch in range(epochs):
+    for e in range(epochs):
+        epoch = e + epoch_offset
 
         # -------- TRAIN --------
         model.train()
@@ -196,6 +226,7 @@ if __name__ == "__main__":
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-epochs", type=int, default=1)
     ap.add_argument("-wandb_disabled", action="store_true")
+    ap.add_argument("-checkpoint_path", type=str, default="")
     ap.add_argument(
         "-puzzle_sizes",
         nargs="+",
@@ -213,4 +244,5 @@ if __name__ == "__main__":
         epochs=args.epochs,
         puzzle_sizes=args.puzzle_sizes,
         wandb_disabled=args.wandb_disabled,
+        checkpoint_path=args.checkpoint_path,
     )
