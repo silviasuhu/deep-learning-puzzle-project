@@ -16,7 +16,9 @@ from datetime import datetime
 
 
 def main(
-    batch_size: int, steps: int, epochs: int, puzzle_sizes: list, wandb_disabled: bool
+    batch_size: int, steps: int, epochs: int, puzzle_sizes: list, 
+    wandb_disabled: bool, wandb_project: str,
+    visual_model: str, gnn_model: str, degree: int
 ):
     print(f"Cuda is available: {torch.cuda.is_available()}")
 
@@ -27,7 +29,8 @@ def main(
         input_channels=4,
         output_channels=4,
         n_layers=4,
-        model="resnet18equiv",
+        model=visual_model,
+        architecture=gnn_model
     )
     model.to(device)
 
@@ -43,7 +46,7 @@ def main(
     run = (
         wandb.init(
             entity="postgraduate-project-puzzle-upc",
-            project="Puzzle Diffusion_GNN",
+            project=wandb_project,
             # project="my-awesome-project",
             name=f"{timestamp}_Puzzle{puzzle_sizes}_steps{steps}_bs{batch_size}",
             # Track hyperparameters and run metadata.
@@ -66,7 +69,7 @@ def main(
         dataset=train_dt,
         patch_per_dim=patch_per_dim,
         augment=False,
-        degree=-1,
+        degree=degree,
         unique_graph=None,
         all_equivariant=False,
         random_dropout=False,
@@ -196,6 +199,7 @@ if __name__ == "__main__":
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-epochs", type=int, default=1)
     ap.add_argument("-wandb_disabled", action="store_true")
+    ap.add_argument("-wandb_project", type=str)
     ap.add_argument(
         "-puzzle_sizes",
         nargs="+",
@@ -203,6 +207,11 @@ if __name__ == "__main__":
         type=int,
         help="Input a list of values. They will be used to create puzzles of different sizes during training (for example, if list is 2 4 7 then puzzles will be divided into 2x2, 4x4, and 7x7).",
     )
+    ap.add_argument("-visual_model", type=str, default="resnet18equiv")
+    ap.add_argument("-gnn_model", type=str, default="transformer")
+    ap.add_argument("-degree", type=int, default=-1,
+                    help="Degree of the expander graph. -1 = fully connected")
+    
 
     args = ap.parse_args()
     print(args)
@@ -213,4 +222,8 @@ if __name__ == "__main__":
         epochs=args.epochs,
         puzzle_sizes=args.puzzle_sizes,
         wandb_disabled=args.wandb_disabled,
+        wandb_project=args.wandb_project,
+        visual_model=args.visual_model,
+        gnn_model=args.gnn_model,
+        degree=args.degree
     )
