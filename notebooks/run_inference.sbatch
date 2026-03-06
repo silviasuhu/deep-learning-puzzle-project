@@ -21,4 +21,8 @@ unset __conda_setup
 
 conda activate puzzle-project
 
-python run_inference.py
+export SSL_CERT_FILE=$(python -c "import certifi; print(certifi.where())")
+export PYTHONPATH=/data/mlmcri/Projects/Side_projects/puzzle-project:$PYTHONPATH
+
+python notebooks/run_inference.py -batch_size 4 -steps 300 -puzzle_sizes 20 -degree 60 -model_checkpoint "exo60_max_epoch105.pt" -visual_model "resnet18equiv" \
+-gnn_model "exophormer" -dataset_path "/data/mlmcri/Projects/Side_projects/puzzle-project/data/CelebA-HQ"
