@@ -1,3 +1,4 @@
+import sys
 import argparse
 from pathlib import Path
 import torch
@@ -21,8 +22,9 @@ def main(
     epochs: int,
     puzzle_sizes: list,
     wandb_disabled: bool,
-    checkpoint_path: str,
+    checkpoint_load_path: str,
     wandb_project: str,
+    project_name: str,
     visual_model: str,
     gnn_model: str,
     degree: int,
@@ -32,9 +34,14 @@ def main(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    best_acc_pos = 0.0
+
+    if not wandb_project:
+        wandb_project = project_name
+
     epoch_offset = 0
-    if checkpoint_path:
-        checkpoint = torch.load(checkpoint_path, weights_only=False)
+    if checkpoint_load_path:
+        checkpoint = torch.load(checkpoint_load_path, weights_only=False)
 
         epoch_offset = checkpoint["epoch"]
         steps = checkpoint["config"]["steps"]
@@ -53,6 +60,15 @@ def main(
         optimizer = Adafactor(model.parameters())
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
+        best_acc_pos = (
+            checkpoint["metrics"]["best_pos_accuracy"]
+            or checkpoint["metrics"]["val_pos_accuracy"]
+        )
+
+        print(
+            f"Loaded checkpoint from {checkpoint_load_path} at epoch {epoch_offset} with best position accuracy {best_acc_pos:.4f}"
+        )
+
     else:
         model = Eff_GAT(
             steps=steps,
@@ -63,6 +79,16 @@ def main(
             architecture=gnn_model,
         )
         optimizer = Adafactor(model.parameters())
+
+    checkpoint_dir = Path("outputs") / "checkpoints" / project_name
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    # If last_model.pt exists, notify user and stop, to prevent overwriting
+    if not checkpoint_load_path and (checkpoint_dir / "last_model.pt").exists():
+        print(
+            f"Warning: {checkpoint_dir / 'last_model.pt'} already exists. To prevent overwriting, the script will stop. If you want to continue training from this checkpoint, use the --checkpoint_load_path argument with the path to this file. If you want to start a new training run, you can delete the file, move it to a different location or use a different '-project_name' parameter."
+        )
+        sys.exit(1)
 
     model.to(device)
 
@@ -90,7 +116,7 @@ def main(
                 "model": "Eff_gat",
                 "optimizer": "Adafactor",
                 "loss": "smooth_l1",
-                "checkpoint_path": checkpoint_path,
+                "checkpoint_load_path": checkpoint_load_path,
             },
         )
         if not wandb_disabled
@@ -127,9 +153,6 @@ def main(
     )
 
     gnn_diffusion = GNN_Diffusion(steps=steps)
-
-    checkpoint_dir = Path("outputs") / "checkpoints"
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     for e in range(epochs):
         epoch = e + epoch_offset
@@ -197,32 +220,44 @@ def main(
             f"Pos Accuracy: {val_acc_pos_mean:.4f} | "
             f"Rot Accuracy: {val_rot_acc_mean:.4f} | "
         )
-        # f"Strict Accuracy: {val_strict_acc_mean:.4f}"
         #   ---- CHECKPOINT ----
-        if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
-            checkpoint_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
+        checkpoint = {
+            "epoch": epoch + 1,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "config": {
+                "steps": steps,
+                "batch_size": batch_size,
+                "puzzle_sizes": puzzle_sizes,
+            },
+            "metrics": {
+                "val_loss": val_loss_mean,
+                "val_pos_error": val_pos_mean,
+                "val_rot_error": val_rot_mean,
+                "val_pos_accuracy": val_acc_pos_mean,
+                "val_rot_accuracy": val_rot_acc_mean,
+                "best_pos_accuracy": best_acc_pos,
+            },
+        }
 
-            checkpoint = {
-                "epoch": epoch + 1,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "config": {
-                    "steps": steps,
-                    "batch_size": batch_size,
-                    "puzzle_sizes": puzzle_sizes,
-                },
-                "metrics": {
-                    "val_loss": val_loss_mean,
-                    "val_pos_error": val_pos_mean,
-                    "val_rot_error": val_rot_mean,
-                    "val_pos_accuracy": val_acc_pos_mean,
-                    "val_rot_accuracy": val_rot_acc_mean,
-                    # "val_strict_accuracy": val_strict_acc_mean,
-                },
-            }
+        # Store the best checkpoint
+        if val_acc_pos_mean > best_acc_pos:
+            best_acc_pos = val_acc_pos_mean
+            checkpoint_save_path = checkpoint_dir / "best_model.pt"
+            torch.save(checkpoint, checkpoint_save_path)
+            print(f"Saved checkpoint: {checkpoint_save_path}")
 
-            torch.save(checkpoint, checkpoint_path)
-            print(f"Saved checkpoint: {checkpoint_path}")
+        # Store checkpoint every 10 epochs and in the last epoch
+        if (epoch + 1) % 10 == 0 or (epoch + 1) == epochs:
+            checkpoint_save_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
+            torch.save(checkpoint, checkpoint_save_path)
+            print(f"Saved checkpoint: {checkpoint_save_path}")
+
+        # Always store last checkpoint
+        checkpoint_save_path = checkpoint_dir / "last_model.pt"
+        torch.save(checkpoint, checkpoint_save_path)
+        print(f"Saved checkpoint: {checkpoint_save_path}")
+
     run.finish()
 
 
@@ -235,6 +270,7 @@ if __name__ == "__main__":
     ap.add_argument("-epochs", type=int, default=1)
     ap.add_argument("-wandb_disabled", action="store_true")
     ap.add_argument("-wandb_project", type=str)
+    ap.add_argument("-project_name", type=str, default="puzzle")
     ap.add_argument("-checkpoint_path", type=str, default="")
     ap.add_argument(
         "-puzzle_sizes",
@@ -263,9 +299,10 @@ if __name__ == "__main__":
         puzzle_sizes=args.puzzle_sizes,
         wandb_disabled=args.wandb_disabled,
         wandb_project=args.wandb_project,
+        project_name=args.project_name,
         visual_model=args.visual_model,
         gnn_model=args.gnn_model,
         degree=args.degree,
-        checkpoint_path=args.checkpoint_path,
+        checkpoint_load_path=args.checkpoint_path,
         missing_percentage=args.missing_percentage,
     )
