@@ -26,6 +26,7 @@ def main(
     visual_model: str,
     gnn_model: str,
     degree: int,
+    missing_percentage: int,
 ):
     print(f"Cuda is available: {torch.cuda.is_available()}")
 
@@ -105,6 +106,7 @@ def main(
         unique_graph=None,
         all_equivariant=False,
         random_dropout=False,
+        missing_percentage=missing_percentage,
     )
     # split dataset training and validation:
     val_ratio = 0.1
@@ -249,6 +251,7 @@ if __name__ == "__main__":
         default=-1,
         help="Degree of the expander graph. -1 = fully connected",
     )
+    ap.add_argument("-missing_percentage", type=int, default=0)
 
     args = ap.parse_args()
     print(args)
@@ -264,4 +267,5 @@ if __name__ == "__main__":
         gnn_model=args.gnn_model,
         degree=args.degree,
         checkpoint_path=args.checkpoint_path,
+        missing_percentage=args.missing_percentage,
     )

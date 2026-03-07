@@ -318,6 +318,7 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset):
         unique_graph=None,
         all_equivariant=False,
         random_dropout=False,
+        missing_percentage=0,
     ) -> None:
         super().__init__(
             dataset=dataset,
@@ -332,6 +333,7 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset):
         self.all_equivariant = all_equivariant
         self.unique_graph = unique_graph
         self.random_dropout = random_dropout
+        self.missing_pieces_perc = missing_percentage
         if self.unique_graph is not None:
             self.edge_index = create_graph(
                 self.patch_per_dim, self.degree, self.unique_graph
@@ -446,6 +448,20 @@ class Puzzle_Dataset_ROT(Puzzle_Dataset):
         )
         if self.concat_rot:
             xy = torch.cat([xy, rots_tensor], 1)
+
+        if self.missing_pieces_perc != 0:
+            num_pieces = xy.shape[0]
+            pieces_to_remove = math.ceil(num_pieces * self.missing_pieces_perc / 100)
+
+            perm = list(range(num_pieces))
+
+            random.shuffle(perm)
+            perm = perm[: num_pieces - pieces_to_remove]
+            xy = xy[perm]
+            patches = patches[perm]
+
+            adj_mat = torch.ones(xy.shape[0], xy.shape[0])
+            edge_index, edge_attr = pyg.utils.dense_to_sparse(adj_mat)
 
         data = pyg_data.Data(
             x=xy,
