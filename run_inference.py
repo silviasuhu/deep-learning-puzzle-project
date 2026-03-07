@@ -109,7 +109,7 @@ def main(
     # Dataloader for inference
     test_loader = torch_geometric.loader.DataLoader(test_puzzle_dt, 
                                                     batch_size=batch_size, 
-                                                    shuffle=True)
+                                                    shuffle=False)
 
     # %%
     # Function to add rotational info for the model to work
