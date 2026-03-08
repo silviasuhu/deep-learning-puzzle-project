@@ -60,11 +60,11 @@ Install all other Python dependencies listed in requirements.txt:
 pip install -r requirements.txt
 ```
 
-## 3. Dataset Setup: CelebA-HQ
+### 3. Dataset Setup: CelebA-HQ
 
 This project uses the CelebAMask-HQ dataset.
 
-### 3.1 Download the dataset
+#### 3.1 Download the dataset
 
 You can obtain the dataset from either of the following sources:
 
@@ -73,7 +73,7 @@ You can obtain the dataset from either of the following sources:
 
 Download the CelebAMask-HQ.zip file to your local machine.
 
-### 3.2 Organize and extract the dataset
+#### 3.2 Organize and extract the dataset
 
 Follow these steps to decompress and place the dataset in this repository:
 
@@ -90,17 +90,80 @@ After extraction, ensure that the dataset files are correctly placed under
 data/CelebA-HQ/
 ```
 
-### 4. Next steps [WIP]
+### 4. Training
 
-- Training and evaluation instructions
-- Configuration options
-- Experiment reproducibility notes
-  These sections will be added as the project evolves.
+To start a training loop, run the script `src/train_script.py` with Python and provide the desired parameters.
 
-## Notes & Troubleshooting
+The following parameters can be used when calling the script:
+
+```
+usage: train_script.py [-h] [-b BATCH_SIZE] [-s STEPS] [-e EPOCHS] [-p PUZZLE_SIZES [PUZZLE_SIZES ...]] [-d DEGREE] [--project_name PROJECT_NAME] [--visual_model VISUAL_MODEL] [--gnn_model GNN_MODEL] [--checkpoint_path CHECKPOINT_PATH] [--missing_percentage MISSING_PERCENTAGE]
+                       [--wandb_disabled] [--wandb_project WANDB_PROJECT]
+
+options:
+  -h, --help            show this help message and exit
+  -b BATCH_SIZE, --batch_size BATCH_SIZE
+                        Batch size for training
+  -s STEPS, --steps STEPS
+                        Number of diffusion steps
+  -e EPOCHS, --epochs EPOCHS
+                        Maximum number of epochs to train for
+  -p PUZZLE_SIZES [PUZZLE_SIZES ...], --puzzle_sizes PUZZLE_SIZES [PUZZLE_SIZES ...]
+                        Input a list of values. They will be used to create puzzles of different sizes during training (for example, if list is 2 4 7 then puzzles will be divided into 2x2, 4x4, and 7x7 pieces).
+  -d DEGREE, --degree DEGREE
+                        Degree of the expander graph. -1 = fully connected. Default is -1.
+  --project_name PROJECT_NAME
+                        Project name mainly used for checkpoint naming and Weights & Biases logging if -wandb_project is not set.
+  --visual_model VISUAL_MODEL
+                        Model used to convert patches to feature embeddings. Options: 'resnet18equiv' or any model accesible by timm. Default is 'resnet18equiv'.
+  --gnn_model GNN_MODEL
+                        GNN model to use. Options: 'transformer', 'exophormer'. Default is 'transformer'.
+  --checkpoint_path CHECKPOINT_PATH
+                        Path to the checkpoint to load. If not set, training will start from scratch. If set, the script will attempt to load the checkpoint at the specified path and resume training from that point.
+  --missing_percentage MISSING_PERCENTAGE
+                        Percentage of missing pieces in the puzzle (0-100). Default is 0 (no missing pieces).
+  --wandb_disabled      Disable logging to Weights & Biases. If unset, the script will log to Weights & Biases using the project name specified in -wandb_project or -project_name.
+  --wandb_project WANDB_PROJECT
+                        Weights & Biases project name. If not set, the script will use the value of -project_name as the project name for Weights & Biases logging.
+```
+
+The following command shows an example of how to run a training session using an Exophormer with a 60% graph connectivity, 300 diffusion steps, and images randomly split into 6×6 or 10×10 patches.
+
+```
+python src/train_script.py --batch_size 12 --steps 300 --epochs 300 --puzzle_sizes 6 10 --gnn_model 'exophormer' --degree 60
+```
+
+Note that if you are not logged into Weight & Biases you'll be prompted to add an API KEY to proceed with the training. If you don't want to use Weight & Biases, you can disable it through the parameter '--wandb_disabled'.
+
+#### Checkpoints
+
+During training:
+
+- the latest checkpoint is always saved to `outputs/checkpoints/<project_name>/last_model.pt`.
+- the model that achieves the best position accuracy is saved to `outputs/checkpoints/<project_name>/best_model.py`.
+- aditionally, a checkpoint is saved every 5 epochs.
+
+### 5. Inference
+
+TODO
+
+#### Inference Animation
+
+TODO
+
+### Notes & Troubleshooting
 
 - Always activate the virtual environment before running any scripts.
 
 - If you encounter installation issues with torch-scatter, double-check your Python version, PyTorch version, and CUDA compatibility.
 
 - For GPU usage, verify CUDA availability with:
+
+```
+import torch
+print(torch.cuda.is_available())
+```
+
+## Experiments
+
+TODO
