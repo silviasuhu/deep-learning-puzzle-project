@@ -247,8 +247,8 @@ def main(
             torch.save(checkpoint, checkpoint_save_path)
             print(f"Saved checkpoint: {checkpoint_save_path}")
 
-        # Store checkpoint every 10 epochs and in the last epoch
-        if (epoch + 1) % 10 == 0 or (epoch + 1) == epochs:
+        # Store checkpoint every 5 epochs and in the last epoch
+        if (epoch + 1) % 5 == 0 or (epoch + 1) == epochs:
             checkpoint_save_path = checkpoint_dir / f"model_epoch{epoch+1}.pt"
             torch.save(checkpoint, checkpoint_save_path)
             print(f"Saved checkpoint: {checkpoint_save_path}")
@@ -265,29 +265,74 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-batch_size", type=int, default=6)
-    ap.add_argument("-steps", type=int, default=300)
-    ap.add_argument("-epochs", type=int, default=1)
-    ap.add_argument("-wandb_disabled", action="store_true")
-    ap.add_argument("-wandb_project", type=str)
-    ap.add_argument("-project_name", type=str, default="puzzle")
-    ap.add_argument("-checkpoint_path", type=str, default="")
     ap.add_argument(
-        "-puzzle_sizes",
+        "-b", "--batch_size", type=int, default=6, help="Batch size for training"
+    )
+    ap.add_argument(
+        "-s", "--steps", type=int, default=300, help="Number of diffusion steps"
+    )
+    ap.add_argument(
+        "-e",
+        "--epochs",
+        type=int,
+        default=1,
+        help="Maximum number of epochs to train for",
+    )
+    ap.add_argument(
+        "-p",
+        "--puzzle_sizes",
         nargs="+",
         default=[6],
         type=int,
-        help="Input a list of values. They will be used to create puzzles of different sizes during training (for example, if list is 2 4 7 then puzzles will be divided into 2x2, 4x4, and 7x7).",
+        help="Input a list of values. They will be used to create puzzles of different sizes during training (for example, if list is 2 4 7 then puzzles will be divided into 2x2, 4x4, and 7x7 pieces).",
     )
-    ap.add_argument("-visual_model", type=str, default="resnet18equiv")
-    ap.add_argument("-gnn_model", type=str, default="transformer")
     ap.add_argument(
-        "-degree",
+        "-d",
+        "--degree",
         type=int,
         default=-1,
-        help="Degree of the expander graph. -1 = fully connected",
+        help="Degree of the expander graph. -1 = fully connected. Default is -1.",
     )
-    ap.add_argument("-missing_percentage", type=int, default=0)
+    ap.add_argument(
+        "--project_name",
+        type=str,
+        default="puzzle",
+        help="Project name mainly used for checkpoint naming and Weights & Biases logging if -wandb_project is not set.",
+    )
+    ap.add_argument(
+        "--visual_model",
+        type=str,
+        default="resnet18equiv",
+        help="Model used to convert patches to feature embeddings. Options: 'resnet18equiv' or any model accesible by timm. Default is 'resnet18equiv'.",
+    )
+    ap.add_argument(
+        "--gnn_model",
+        type=str,
+        default="transformer",
+        help="GNN model to use. Options: 'transformer', 'exophormer'. Default is 'transformer'.",
+    )
+    ap.add_argument(
+        "--checkpoint_path",
+        type=str,
+        default="",
+        help="Path to the checkpoint to load. If not set, training will start from scratch. If set, the script will attempt to load the checkpoint at the specified path and resume training from that point.",
+    )
+    ap.add_argument(
+        "--missing_percentage",
+        type=int,
+        default=0,
+        help="Percentage of missing pieces in the puzzle (0-100). Default is 0 (no missing pieces).",
+    )
+    ap.add_argument(
+        "--wandb_disabled",
+        action="store_true",
+        help="Disable logging to Weights & Biases. If unset, the script will log to Weights & Biases using the project name specified in -wandb_project or -project_name.",
+    )
+    ap.add_argument(
+        "--wandb_project",
+        type=str,
+        help="Weights & Biases project name. If not set, the script will use the value of -project_name as the project name for Weights & Biases logging.",
+    )
 
     args = ap.parse_args()
     print(args)
