@@ -185,7 +185,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
         return data
 
 
-class Puzzle_Dataset_ROT(Puzzle_Dataset):
+class Puzzle_Dataset_Edge_ROT(Puzzle_Dataset):
     def __init__(
         self,
         dataset=None,

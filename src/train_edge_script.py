@@ -5,11 +5,11 @@ import torch
 import torch_geometric
 import numpy as np
 
-from dataset_celeb import Puzzle_Dataset_Edge_ROT
-from puzzle_dataset import Puzzle_Dataset_ROT
-from gnn_diffusion import GNN_Diffusion
+from dataset_celeb import CelebA_DataSet
+from puzzle_edgefeat_dataset import Puzzle_Dataset_Edge_ROT
+from edgegnn_diffusion import EdgeGNN_Diffusion
 from transformers.optimization import Adafactor
-from model.efficient_gat import Eff_GAT
+from model.border_gat import Border_GAT
 from torch.utils.data import random_split
 import wandb
 
@@ -47,7 +47,7 @@ def main(
         steps = checkpoint["config"]["steps"]
         puzzle_sizes = checkpoint["config"]["puzzle_sizes"]
 
-        model = Eff_GAT(
+        model = Border_GAT(
             steps=steps,
             input_channels=4,
             output_channels=4,
@@ -70,13 +70,14 @@ def main(
         )
 
     else:
-        model = Eff_GAT(
+        model = Border_GAT(
             steps=steps,
             input_channels=4,
             output_channels=4,
             n_layers=4,
             model=visual_model,
             architecture=gnn_model,
+            #freeze_backbone=True
         )
         optimizer = Adafactor(model.parameters())
 
@@ -113,10 +114,12 @@ def main(
                 "epochs": epochs,
                 "epoch_offset": epoch_offset,
                 "puzzle_sizes": puzzle_sizes,
-                "model": "Eff_gat",
+                "model": "Border_GAT",
                 "optimizer": "Adafactor",
                 "loss": "smooth_l1",
                 "checkpoint_load_path": checkpoint_load_path,
+                "edge_features": "border_similarity",
+                "edge_embedding_dim": 32
             },
         )
         if not wandb_disabled
@@ -124,7 +127,7 @@ def main(
     )
 
     train_dt = CelebA_DataSet(train=True)
-    train_validation_dataset = Puzzle_Dataset_ROT(
+    train_validation_dataset = Puzzle_Dataset_Edge_ROT(
         dataset=train_dt,
         patch_per_dim=patch_per_dim,
         augment=False,
@@ -132,7 +135,7 @@ def main(
         unique_graph=None,
         all_equivariant=False,
         random_dropout=False,
-        missing_percentage=missing_percentage,
+        #missing_percentage=missing_percentage,
     )
     # split dataset training and validation:
     val_ratio = 0.1
@@ -152,7 +155,7 @@ def main(
         val_dataset, batch_size=batch_size, shuffle=True
     )
 
-    gnn_diffusion = GNN_Diffusion(steps=steps)
+    gnn_diffusion = EdgeGNN_Diffusion(steps=steps)
 
     for e in range(epochs):
         epoch = e + epoch_offset
