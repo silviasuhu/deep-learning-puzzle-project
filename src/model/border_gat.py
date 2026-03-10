@@ -1,9 +1,7 @@
 """
 Implementation of a Eff_GAT variant that computes edge features the cosine similarity of the border pixels of the patches.
-These are computed after injecting noise and embedded through a 1D CNN + global pooling to remove position information bias
-and make it a fixed size vector. This is done in the dataset class during the diffusion step, and the edge features are stored
-in the edge_attr attribute of the Data object.
-
+These are computed each step through a 1D CNN + global pooling to remove position information bias
+and make it a fixed size vector.
 Returns:
     _type_: _description_
 """
@@ -97,7 +95,7 @@ class Border_GAT(nn.Module):
         visual_pretrained=True,
         freeze_backbone=False,
         model="resnet18equiv",
-        architecture="transformer",
+        architecture="edge_transformer",
         virt_nodes=4,
         all_equivariant=False,
     ) -> None:
@@ -221,71 +219,48 @@ class Border_GAT(nn.Module):
 
     # Compute cosine similairty of the embeddings of the edge pixels to use as edge features. 
     def compute_edge_features(self, patches, edge_index):
-        """
-        Optimized computation of edge features.
+        # patches: [N, C, H, W]
+        # edge_index: [2, E]
+        n, c, h, w = patches.shape
+        device = patches.device
 
-        patches: [num_patches, C, H, W]
-        edge_index: [2, num_edges]
+        # Extract borders in batch 
+        top = patches[:, :, 0, :]          # [N, C, L]
+        right = patches[:, :, :, -1]       # [N, C, L]
+        bottom = patches[:, :, -1, :]      # [N, C, L]
+        left = patches[:, :, :, 0]         # [N, C, L]
+        borders = torch.stack([top, right, bottom, left], dim=1)   # [N, 4, C, L]
+        borders = borders.flatten(2)                              # [N, 4, C*L]
 
-        Returns:
-            edge_feats: [num_edges, edge_feat_dim]
-        """
+        # 2) Embed all borders in one batch
+        border_flat = borders.reshape(n * 4, -1)                  # [N*4, C*L]
+        emb = self.border_embedding(border_flat)                  # [N*4, H]
+        emb = emb.view(n, 4, -1)                                  # [N, 4, H]
 
-        cos = nn.CosineSimilarity(dim=0)
+        # 3) Cosine similarities for edges in batch
+        src, dst = edge_index
+        emb_i = emb[src]   # [E, 4, H]
+        emb_j = emb[dst]   # [E, 4, H]
 
-        num_patches = patches.shape[0]
-        num_edges = edge_index.shape[1]
+        emb_i_n = F.normalize(emb_i, dim=-1)
+        emb_j_n = F.normalize(emb_j, dim=-1)
 
-        # Compute border embeddings of all patches
-        patch_border_embeddings = []
-
-        for p in range(num_patches):
-            borders = extract_patch_sides(patches[p].unsqueeze(0))  # returns 4 borders, each [1, C, L]
-            borders = [b.flatten(1) for b in borders]  # flatten C dimension -> [1, L*C]
-            borders = [self.border_embedding(b) for b in borders]  # [1, hidden_dim]
-
-            # 4 borders per patch
-            emb = [self.border_embedding(b) for b in borders]
-            emb = torch.stack(emb, dim=0)  # [4, hidden_dim]
-
-            patch_border_embeddings.append(emb)  # [4, hidden_dim]
-
-        patch_border_embeddings = torch.stack(patch_border_embeddings)
-
-
-        # Use border embeddings to compute edge features
-        edge_feats = []
-
-        for i, j in edge_index.t():
-
-            borders_i = patch_border_embeddings[i]  # Borders of patch i [4, hidden_dim]
-            borders_j = patch_border_embeddings[j]  # Borders of patch j [4, hidden_dim]
-
-            # 16 cosine similarities
-            sims = []
-
-            for bi in borders_i:
-                for bj in borders_j:
-                    sims.append(cos(bi, bj))
-
-            sims = torch.stack(sims)
-
-            best_idx = torch.argmax(sims) # Get the best one
-
-            # map index back to border pair
-            bi_idx = best_idx // 4
-            bj_idx = best_idx % 4
-
-            best_bi = borders_i[bi_idx] #Get the border of i corresponing to the best cos sim
-            best_bj = borders_j[bj_idx] #Get the border of j corresponing to the best cos sim
-
-            best_border_feat = torch.cat([best_bi, best_bj], dim=-1) # Concat
-
-            edge_feat = self.border_mlp(best_border_feat) #Pass trough an mlp to get embeddings
-
-            edge_feats.append(edge_feat) # Append to edge_feats
-
-        return torch.stack(edge_feats)
+        # Compare similarity using einsum (4x4 similrity matrix)
+        sims = torch.einsum("eah,ebh->eab", emb_i_n, emb_j_n)      # [E, 4, 4]
+        sims_flat = sims.view(sims.size(0), -1)                    # [E, 16]
+        
+        # Select best pair and extract original embeddings of those 2 borders
+        best = sims_flat.argmax(dim=-1)
+        bi = best // 4
+        bj = best % 4
+        idx = torch.arange(sims.size(0), device=device)
+        best_bi = emb_i[idx, bi]                                   # [E, H]
+        best_bj = emb_j[idx, bj]                                   # [E, H]
+        
+        # Stack and pass through a MLP
+        edge_feat = self.border_mlp(torch.cat([best_bi, best_bj], dim=-1))
+        
+        return edge_feat
     
     def visual_features(self, patch_rgb):
         patch_rgb = (patch_rgb - self.mean) / self.std

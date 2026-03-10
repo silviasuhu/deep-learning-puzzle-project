@@ -166,7 +166,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
             edge_index, _ = pyg.utils.dense_to_sparse(adj_mat)
             
             # Empty edge features (placeholder)
-            edge_attr = torch.zeros(edge_index.shape[1], 1)  # 1 dummy feature
+            # edge_attr = torch.zeros(edge_index.shape[1], 1)  # 1 dummy feature
             
         else:
             raise ValueError("Unique graph generation is currently only supported for fully connected graphs (degree=-1)")
@@ -178,7 +178,7 @@ class Puzzle_Dataset(pyg_data.Dataset):
             edge_index=(
                 self.edge_index[patch_per_dim] if self.unique_graph else edge_index
             ),
-            edge_attr=edge_attr, #Add dummy edge attributes (computed during diffusion step)
+            #edge_attr=edge_attr,
             ind_name=torch.tensor([idx]).long(),
             patches_dim=torch.tensor([patch_per_dim]),
         )
@@ -255,7 +255,7 @@ class Puzzle_Dataset_Edge_ROT(Puzzle_Dataset):
             edge_index, _ = pyg.utils.dense_to_sparse(adj_mat)
             
             # Empty edge features (placeholder)
-            edge_attr = torch.zeros(edge_index.shape[1], 1)  # 1 dummy feature
+            #edge_attr = torch.zeros(edge_index.shape[1], 1)  # 1 dummy feature
             
 
         else:
@@ -317,7 +317,7 @@ class Puzzle_Dataset_Edge_ROT(Puzzle_Dataset):
             edge_index=(
                 self.edge_index[patch_per_dim] if self.unique_graph else edge_index
             ),
-            edge_attr=edge_attr, #Add dummy edge attributes (computed during diffusion step)
+            #edge_attr=edge_attr,
             ind_name=torch.tensor([idx]).long(),
             patches_dim=torch.tensor([patch_per_dim]),
         )

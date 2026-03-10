@@ -165,7 +165,7 @@ def main(
         train_losses = []
 
         for batch in train_loader:
-            batch = batch.to(device)
+            #batch = batch.to(device)
             loss = gnn_diffusion.training_step(batch, model, criterion, optimizer)
             # losses.append(loss)
             train_losses.append(loss)
@@ -311,8 +311,8 @@ if __name__ == "__main__":
     ap.add_argument(
         "--gnn_model",
         type=str,
-        default="transformer",
-        help="GNN model to use. Options: 'transformer', 'exophormer'. Default is 'transformer'.",
+        default="edge_transformer",
+        help="GNN model to use. Options: 'edge_transformer'. Default is 'edge_transformer'.",
     )
     ap.add_argument(
         "--checkpoint_path",
