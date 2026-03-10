@@ -5,7 +5,7 @@ import torch
 import torch_geometric
 import numpy as np
 
-from dataset_celeb import Puzzle_Dataset_Edge_ROT
+from dataset_celeb import CelebA_DataSet
 from puzzle_dataset import Puzzle_Dataset_ROT
 from gnn_diffusion import GNN_Diffusion
 from transformers.optimization import Adafactor
