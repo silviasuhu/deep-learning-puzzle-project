@@ -20,11 +20,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import torch_geometric
 import argparse
 
-from src.model.full_models import *
-from src.full_dataset import *
+from src.dataset_celeb import CelebA_DataSet
+from src.puzzle_dataset import Puzzle_Dataset_ROT
 from src.gnn_diffusion import *
+from model.efficient_gat import Eff_GAT
 
 
 # %%
@@ -51,65 +53,63 @@ def main(
     print(f"Batch size: {batch_size}", flush=True)
     print(f"Using device: {device}", flush=True)
 
-
-
     # %% [markdown]
     # ## 1.- Load test dataset
 
     # %%
     # Load base dataset
-    test_dataset_base = CelebA_HQ(dataset_path, train=False)
+    test_dt = CelebA_DataSet(train=False)
 
     # Create puzzle dataset
     # Load puzzle dataset and sample an element
-    test_puzzle_dt = Puzzle_Dataset(
-                            dataset=test_dataset_base,
-                            patch_per_dim=[(puzzle_sizes,puzzle_sizes)], 
-                            augment=False, 
-                            degree=degree, 
-                            unique_graph=None)
+    test_dataset = Puzzle_Dataset_ROT(
+        dataset=test_dt,
+        patch_per_dim=[(puzzle_sizes, puzzle_sizes)],
+        augment=False,
+        degree=degree,
+        unique_graph=None,
+        all_equivariant=False,
+        random_dropout=False,
+    )
 
     # %% [markdown]
     # ## 2.- Load model with checkpoint
 
     # %%
-    #Load model
-    model = Eff_GAT(steps=steps,
-                    input_channels=4,
-                    output_channels=4,
-                    n_layers=4,
-                    model=visual_model,
-                    architecture=gnn_model)
+    # Load model
+    model = Eff_GAT(
+        steps=steps,
+        input_channels=4,
+        output_channels=4,
+        n_layers=4,
+        model=visual_model,
+        architecture=gnn_model,
+    )
 
     # Send model to device
     model.to(device)
 
     # Load model with the checkpoint and set to evaluation mode
-    checkpoint = torch.load(f"checkpoints/{model_checkpoint}",
-                            weights_only=False,
-                            map_location=device)
+    checkpoint = torch.load(
+        f"checkpoints/{model_checkpoint}", weights_only=False, map_location=device
+    )
 
     model.load_state_dict(checkpoint["model_state_dict"])
-    #model.load_state_dict(checkpoint)
+    # model.load_state_dict(checkpoint)
     model.eval()
-
 
     print("Model parameters after loading checkpoint:", flush=True)
     for name, param in model.named_parameters():
         print(name, param, flush=True)
 
-
     # %% [markdown]
     # ## 3.- Run inference for the whole dataset
 
-    # %% [markdown]
-    # 
-
     # %%
     # Dataloader for inference
-    test_loader = torch_geometric.loader.DataLoader(test_puzzle_dt, 
-                                                    batch_size=batch_size, 
-                                                    shuffle=False)
+    test_loader = torch_geometric.loader.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False
+    )
 
     # %%
     # Function to add rotational info for the model to work
@@ -152,10 +152,13 @@ def main(
 
     # Disable gradient tracking (save memory,prevents accidental backprop)
     with torch.no_grad():
-        for i,batch in enumerate(test_loader):
+        for i, batch in enumerate(test_loader):
             # Print info
-            print(f"Processing batch num {i}/{len(test_loader)} with batch_size {batch.batch.max().item()+1}", flush=True)
-            
+            print(
+                f"Processing batch num {i}/{len(test_loader)} with batch_size {batch.batch.max().item()+1}",
+                flush=True,
+            )
+
             # Add rotation dimensions and send batch to device
             batch = add_rot(batch).to(device)
             
@@ -172,9 +175,14 @@ def main(
             x_t = torch.randn_like(batch.x)
             
             # Run step-wise inference
-            for t_scalar in reversed(range(steps)):       
-            
-                t_graph = torch.full((num_graphs,), t_scalar, device=gnn_diffusion.device, dtype=torch.long)
+            for t_scalar in reversed(range(steps)):
+
+                t_graph = torch.full(
+                    (num_graphs,),
+                    t_scalar,
+                    device=gnn_diffusion.device,
+                    dtype=torch.long,
+                )
                 t = t_graph[batch.batch]  # node-level timestep
 
                 pred_noise, _ = model.forward_with_feats(
@@ -194,7 +202,7 @@ def main(
                 ) + torch.sqrt(b_t) * z
                 
             # At the end of the diffusion process, x_t should be the predicted clean pose
-            x_0 = x_t 
+            x_0 = x_t
             # Get position and rotation of the predicted and ground truth poses
             gt_pos, gt_rot = split_pose(x_start)
             pred_pos, pred_rot = split_pose(x_0)
@@ -210,14 +218,15 @@ def main(
             test_rot.append(rot_err.cpu().numpy())
             test_acc_pos.append(acc_pos.cpu().numpy())
             test_rot_acc.append(acc_rot.cpu().numpy())
-            
-            print(f"Batch {i} - Position error: {pos_err:.4f}, \
+
+            print(
+                f"Batch {i} - Position error: {pos_err:.4f}, \
                     Rotation error: {rot_err:.4f}, \
                     Position accuracy: {acc_pos:.4f}, \
                     Rotation accuracy: {acc_rot:.4f}",
-                    flush=True)
+                flush=True,
+            )
 
-        
         # Average metrics
         test_pos_mean = np.mean(test_pos)
         test_rot_mean = np.mean(test_rot)
@@ -228,8 +237,6 @@ def main(
         test_rot_std = np.std(test_rot)
         test_acc_pos_std = np.std(test_acc_pos)
         test_rot_acc_std = np.std(test_rot_acc)
-            
-        
 
     # %% [markdown]
     # ## 4.- Save the data
@@ -238,7 +245,10 @@ def main(
     os.makedirs("test_outputs", exist_ok=True)
 
     # %%
-    with open(f"test_outputs/{model_checkpoint.split('.')[0]}_puzzle_{puzzle_sizes}x{puzzle_sizes}_inference_results.txt", "w") as f:
+    with open(
+        f"test_outputs/{model_checkpoint.split('.')[0]}_puzzle_{puzzle_sizes}x{puzzle_sizes}_inference_results.txt",
+        "w",
+    ) as f:
         f.write(f"Set up:\n{'--'*len(dataset_path)}\n")
         f.write(f"Dataset path: {dataset_path}\n")
         f.write(f"Number of test samples: {len(test_puzzle_dt)}\n")
@@ -258,14 +268,16 @@ def main(
         f.write(f"Standard deviation of rotation error: {test_rot_std:.4f}\n")
         f.write(f"Average position accuracy: {test_acc_pos_mean:.4f}\n")
         f.write(f"Standard deviation of position accuracy: {test_acc_pos_std:.4f}\n")
-        f.write(f"Average rotation accuracy: {test_rot_acc_mean:.4f}\n")   
-        f.write(f"Standard deviation of rotation accuracy: {test_rot_acc_std:.4f}\n") 
+        f.write(f"Average rotation accuracy: {test_rot_acc_mean:.4f}\n")
+        f.write(f"Standard deviation of rotation accuracy: {test_rot_acc_std:.4f}\n")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
 
     # Add the arguments to the parser
-    ap.add_argument("-dataset_path", type=str, default=os.path.join(os.getcwd(), "data/CelebA-HQ"))
+    ap.add_argument(
+        "-dataset_path", type=str, default=os.path.join(os.getcwd(), "data/CelebA-HQ")
+    )
     ap.add_argument("-batch_size", type=int, default=6)
     ap.add_argument("-steps", type=int, default=300)
     ap.add_argument("-model_checkpoint", type=str, default="")
