@@ -160,7 +160,8 @@ def main(
             )
 
             # Add rotation dimensions and send batch to device
-            batch = add_rot(batch).to(device)
+            #batch = add_rot(batch).to(device)
+            batch = batch.to(device)
             
             # Get num batches (graphs) in the current batch of data
             num_graphs = int(batch.batch.max().item()) + 1
@@ -251,7 +252,7 @@ def main(
     ) as f:
         f.write(f"Set up:\n{'--'*len(dataset_path)}\n")
         f.write(f"Dataset path: {dataset_path}\n")
-        f.write(f"Number of test samples: {len(test_puzzle_dt)}\n")
+        f.write(f"Number of test samples: {len(test_dataset)}\n")
         f.write(f"Number of batches: {len(test_loader)}\n")
         f.write(f"Model checkpoint: {model_checkpoint}\n")
         f.write(f"Visual model: {visual_model}\n")
