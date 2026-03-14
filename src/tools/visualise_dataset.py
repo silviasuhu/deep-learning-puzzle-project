@@ -15,13 +15,12 @@ if str(SRC_DIR) not in sys.path:
 from dataset_celeb import CelebA_DataSet
 from puzzle_dataset import Puzzle_Dataset_ROT
 
-out_dir = str(PROJECT_ROOT / "outputs")
+out_dir = str(PROJECT_ROOT / "output_images")
 os.makedirs(out_dir, exist_ok=True)
 
-images_path = str(PROJECT_ROOT / "data/CelebA-HQ/CelebAMask-HQ/CelebA-HQ-img/")
-txt_path = str(PROJECT_ROOT / "data/CelebA-HQ/CelebA-HQ_train.txt")
+dataset_path = str(PROJECT_ROOT / "data/CelebA-HQ")
 
-dataset = CelebA_DataSet(images_path=images_path, txt_path=txt_path)
+dataset = CelebA_DataSet(path=dataset_path, train=True)
 idx = random.randrange(len(dataset))
 img = dataset[idx]
 
