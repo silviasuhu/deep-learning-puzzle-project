@@ -26,7 +26,7 @@ import argparse
 from src.dataset_celeb import CelebA_DataSet
 from src.puzzle_dataset import Puzzle_Dataset_ROT
 from src.gnn_diffusion import *
-from model.efficient_gat import Eff_GAT
+from src.model.efficient_gat import Eff_GAT
 
 
 # %%
