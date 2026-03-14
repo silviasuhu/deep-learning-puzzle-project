@@ -78,21 +78,12 @@ def main(
     # %%
     # Load checkpoint first so we can infer steps from it
     checkpoint = torch.load(
-        f"outputs/checkpoints/{model_checkpoint}",
+        f"./outputs/checkpoints/{model_checkpoint}",
         weights_only=False,
         map_location=device,
     )
 
-    state_dict = (
-        checkpoint["model_state_dict"]
-        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint
-        else checkpoint
-    )
-
-    # Infer steps from the checkpoint's time embedding weight shape
-    if "time_emb.weight" in state_dict:
-        steps = state_dict["time_emb.weight"].shape[0]
-        print(f"Inferred steps from checkpoint: {steps}", flush=True)
+    state_dict = checkpoint["model_state_dict"]
 
     # Load model
     model = Eff_GAT(
@@ -296,7 +287,7 @@ if __name__ == "__main__":
     )
     ap.add_argument("-batch_size", type=int, default=6)
     ap.add_argument("-steps", type=int, default=300)
-    ap.add_argument("-model_checkpoint", type=str, default="model_epoch10.pt")
+    ap.add_argument("-model_checkpoint", type=str, default="")
     ap.add_argument(
         "-puzzle_sizes",
         default=6,
