@@ -145,7 +145,53 @@ During training:
 
 ### 5. Evaluation
 
-TODO
+To evaluate a trained checkpoint on the test split, run the script `src/run_evaluation.py` and provide the corresponding parameters.
+
+The following parameters can be used when calling the script:
+
+```
+usage: run_evaluation.py [-h] [-dataset_path DATASET_PATH] [-batch_size BATCH_SIZE] [-steps STEPS] [-model_checkpoint MODEL_CHECKPOINT] [-puzzle_sizes PUZZLE_SIZES] [-visual_model VISUAL_MODEL] [-gnn_model GNN_MODEL] [-degree DEGREE]
+
+options:
+  -h, --help            show this help message and exit
+  -dataset_path DATASET_PATH
+                        Path to the root of the CelebA-HQ dataset directory. Expected to contain 'images/' and split text files. Default: data/CelebA-HQ
+  -batch_size BATCH_SIZE
+                        Number of puzzle graphs to process per batch during inference. Default: 6
+  -steps STEPS          Number of DDPM reverse-diffusion steps to run. Should match the value used when training the checkpoint. Default: 300
+  -model_checkpoint MODEL_CHECKPOINT
+                        Filename of the checkpoint to load from outputs/checkpoints/ (e.g. 'last_model.pt' or 'best_model.pt').
+  -puzzle_sizes PUZZLE_SIZES
+                        Grid size of the puzzle to evaluate (single integer). E.g. 6 produces a 6×6 puzzle. Only one size can be tested at a time. Default: 6
+  -visual_model VISUAL_MODEL
+                        Backbone used to embed image patches into feature vectors. Use 'resnet18equiv' for the equivariant ResNet-18, or any model name supported by timm. Must match training.
+  -gnn_model GNN_MODEL
+                        GNN architecture used to predict noise over the pose graph. Options: 'transformer', 'exophormer'. Must match training.
+  -degree DEGREE        Degree of the expander graph that defines patch connectivity. -1 means fully connected. Must match training. Default: -1
+```
+
+The following command shows an example of how to evaluate a transformer checkpoint on 6×6 puzzles with 300 diffusion steps.
+
+```
+python src/run_evaluation.py -model_checkpoint last_model.pt -puzzle_sizes 6 -steps 300 -gnn_model exophormer -visual_model resnet18equiv -degree 60
+```
+
+Evaluation results are saved under:
+
+```
+test_outputs/<checkpoint_stem>_puzzle_<N>x<N>_inference_results.txt
+```
+
+The output report includes setup details and aggregate metrics over all test batches (mean and standard deviation):
+
+- Average position error
+- Standard deviation of position error
+- Average rotation error
+- Standard deviation of rotation error
+- Average position accuracy
+- Standard deviation of position accuracy
+- Average rotation accuracy
+- Standard deviation of rotation accuracy
 
 #### Inference Animation
 
