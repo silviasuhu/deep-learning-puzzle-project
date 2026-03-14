@@ -28,6 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 from model.full_models import *
 from puzzle_dataset import *
 from dataset_celeb import CelebA_DataSet
+from gnn_diffusion import *
 
 
 # %%
@@ -189,7 +190,7 @@ def main(
                 t_graph = torch.full(
                     (num_graphs,),
                     t_scalar,
-                    device=gnn_diffusion.device,
+                    device=device,
                     dtype=torch.long,
                 )
                 t = t_graph[batch.batch]  # node-level timestep
