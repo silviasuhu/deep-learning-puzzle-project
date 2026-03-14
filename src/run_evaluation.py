@@ -266,28 +266,89 @@ def main(
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=(
+            "Evaluate a trained puzzle-solving model on the CelebA-HQ test split. "
+            "Runs the full DDPM reverse diffusion process for each batch and reports "
+            "position/rotation error and accuracy (mean ± std across batches). "
+            "Results are saved to test_outputs/<checkpoint>_puzzle_NxN_inference_results.txt."
+        )
+    )
 
     # Add the arguments to the parser
     ap.add_argument(
-        "-dataset_path", type=str, default=str(PROJECT_ROOT / "data" / "CelebA-HQ")
+        "-dataset_path",
+        type=str,
+        default=str(PROJECT_ROOT / "data" / "CelebA-HQ"),
+        help=(
+            "Path to the root of the CelebA-HQ dataset directory. "
+            "Expected to contain 'images/' and split text files. "
+            f"Default: {PROJECT_ROOT / 'data' / 'CelebA-HQ'}"
+        ),
     )
-    ap.add_argument("-batch_size", type=int, default=6)
-    ap.add_argument("-steps", type=int, default=300)
-    ap.add_argument("-model_checkpoint", type=str, default="")
+    ap.add_argument(
+        "-batch_size",
+        type=int,
+        default=6,
+        help="Number of puzzle graphs to process per batch during inference. Default: 6",
+    )
+    ap.add_argument(
+        "-steps",
+        type=int,
+        default=300,
+        help=(
+            "Number of DDPM reverse-diffusion steps to run. "
+            "Should match the value used when training the checkpoint. Default: 300"
+        ),
+    )
+    ap.add_argument(
+        "-model_checkpoint",
+        type=str,
+        default="",
+        help=(
+            "Filename of the checkpoint to load from outputs/checkpoints/ "
+            "(e.g. 'last_model.pt' or 'best_model.pt'). Required."
+        ),
+    )
     ap.add_argument(
         "-puzzle_sizes",
         default=6,
         type=int,
-        help="Puzzle size for the inference (only one size can be tested at a time, so not a list).",
+        help=(
+            "Grid size of the puzzle to evaluate (single integer). "
+            "E.g. 6 produces a 6×6 puzzle. Only one size can be tested at a time. Default: 6"
+        ),
     )
-    ap.add_argument("-visual_model", type=str, default="resnet18equiv")
-    ap.add_argument("-gnn_model", type=str, default="transformer")
+    ap.add_argument(
+        "-visual_model",
+        type=str,
+        default="resnet18equiv",
+        help=(
+            "Backbone used to embed image patches into feature vectors. "
+            "Use 'resnet18equiv' for the equivariant ResNet-18, or any model name "
+            "supported by the timm library. Must match the architecture used during training. "
+            "Default: 'resnet18equiv'"
+        ),
+    )
+    ap.add_argument(
+        "-gnn_model",
+        type=str,
+        default="transformer",
+        help=(
+            "GNN architecture used to predict noise over the pose graph. "
+            "Options: 'transformer', 'exophormer'. Must match the architecture used during training. "
+            "Default: 'transformer'"
+        ),
+    )
     ap.add_argument(
         "-degree",
         type=int,
         default=-1,
-        help="Degree of the expander graph. -1 = fully connected",
+        help=(
+            "Degree of the expander graph that defines patch connectivity. "
+            "-1 means fully connected (all patches see each other). "
+            "Must match the value used during training. Default: -1"
+        ),
     )
 
     args = ap.parse_args()
