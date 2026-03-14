@@ -92,12 +92,12 @@ data/CelebA-HQ/
 
 ### 4. Training
 
-To start a training loop, run the script `src/train_script.py` with Python and provide the desired parameters.
+To start a training loop, run the script `src/run_training.py` with Python and provide the desired parameters.
 
 The following parameters can be used when calling the script:
 
 ```
-usage: train_script.py [-h] [-b BATCH_SIZE] [-s STEPS] [-e EPOCHS] [-p PUZZLE_SIZES [PUZZLE_SIZES ...]] [-d DEGREE] [--project_name PROJECT_NAME] [--visual_model VISUAL_MODEL] [--gnn_model GNN_MODEL] [--checkpoint_path CHECKPOINT_PATH] [--missing_percentage MISSING_PERCENTAGE]
+usage: run_training.py [-h] [-b BATCH_SIZE] [-s STEPS] [-e EPOCHS] [-p PUZZLE_SIZES [PUZZLE_SIZES ...]] [-d DEGREE] [--project_name PROJECT_NAME] [--visual_model VISUAL_MODEL] [--gnn_model GNN_MODEL] [--checkpoint_path CHECKPOINT_PATH] [--missing_percentage MISSING_PERCENTAGE]
                        [--wandb_disabled] [--wandb_project WANDB_PROJECT]
 
 options:
@@ -130,7 +130,7 @@ options:
 The following command shows an example of how to run a training session using an Exophormer with a 60% graph connectivity, 300 diffusion steps, and images randomly split into 6×6 or 10×10 patches.
 
 ```
-python src/train_script.py --batch_size 12 --steps 300 --epochs 300 --puzzle_sizes 6 10 --gnn_model 'exophormer' --degree 60
+python src/run_training.py --batch_size 12 --steps 300 --epochs 300 --puzzle_sizes 6 10 --gnn_model 'exophormer' --degree 60
 ```
 
 Note that if you are not logged into Weight & Biases you'll be prompted to add an API KEY to proceed with the training. If you don't want to use Weight & Biases, you can disable it through the parameter '--wandb_disabled'.
@@ -143,7 +143,7 @@ During training:
 - the model that achieves the best position accuracy is saved to `outputs/checkpoints/<project_name>/best_model.py`.
 - aditionally, a checkpoint is saved every 5 epochs.
 
-### 5. Inference
+### 5. Evaluation
 
 TODO
 

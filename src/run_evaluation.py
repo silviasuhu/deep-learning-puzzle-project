@@ -21,11 +21,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
+from pathlib import Path
 
-from src.model.full_models import *
-from src.puzzle_dataset import *
-from src.gnn_diffusion import *
-from src.dataset_celeb import CelebA_DataSet
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+from model.full_models import *
+from puzzle_dataset import *
+from dataset_celeb import CelebA_DataSet
 
 
 # %%
@@ -78,12 +80,16 @@ def main(
     # %%
     # Load checkpoint first so we can infer steps from it
     checkpoint = torch.load(
-        f"./outputs/checkpoints/{model_checkpoint}",
+        PROJECT_ROOT / "outputs" / "checkpoints" / model_checkpoint,
         weights_only=False,
         map_location=device,
     )
 
-    state_dict = checkpoint["model_state_dict"]
+    state_dict = (
+        checkpoint["model_state_dict"]
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint
+        else checkpoint
+    )
 
     # Load model
     model = Eff_GAT(
@@ -138,9 +144,6 @@ def main(
     # %%
     # Switch model to evaluation mode
     model.eval()
-
-    # Prepare diffusion model
-    gnn_diffusion = GNN_Diffusion(steps=steps)
 
     # same schedule as in GNN_Diffusion
     # calculations for diffusion q(x_t | x_{t-1}) and others
@@ -248,11 +251,13 @@ def main(
     # ## 4.- Save the data
 
     # %%
-    os.makedirs("test_outputs", exist_ok=True)
+    output_dir = PROJECT_ROOT / "test_outputs"
+    os.makedirs(output_dir, exist_ok=True)
 
     # %%
     with open(
-        f"test_outputs/{model_checkpoint.split('.')[0]}_puzzle_{puzzle_sizes}x{puzzle_sizes}_inference_results.txt",
+        output_dir
+        / f"{Path(model_checkpoint).stem}_puzzle_{puzzle_sizes}x{puzzle_sizes}_inference_results.txt",
         "w",
     ) as f:
         f.write(f"Set up:\n{'--'*len(dataset_path)}\n")
@@ -283,7 +288,7 @@ if __name__ == "__main__":
 
     # Add the arguments to the parser
     ap.add_argument(
-        "-dataset_path", type=str, default=os.path.join(os.getcwd(), "data/CelebA-HQ")
+        "-dataset_path", type=str, default=str(PROJECT_ROOT / "data" / "CelebA-HQ")
     )
     ap.add_argument("-batch_size", type=int, default=6)
     ap.add_argument("-steps", type=int, default=300)
