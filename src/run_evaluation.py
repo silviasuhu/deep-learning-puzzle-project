@@ -117,13 +117,7 @@ def main(
     # Switch model to evaluation mode
     model.eval()
 
-    # same schedule as in GNN_Diffusion
-    # calculations for diffusion q(x_t | x_{t-1}) and others
-    betas = linear_beta_schedule(timesteps=steps).to(device)
-    alphas = 1.0 - betas
-    alphas_cumprod = torch.cumprod(alphas, axis=0)
-    sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-    sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+    gnn_diffusion = GNN_Diffusion(steps=steps)
 
     # Initialize lists to store metrics for each batch
     test_pos = []
@@ -142,47 +136,11 @@ def main(
 
             batch = batch.to(device)
 
-            # Get num batches (graphs) in the current batch of data
-            num_graphs = int(batch.batch.max().item()) + 1
-
-            # CNN features from image patches
-            patch_feats = model.visual_features(batch.patches)
-
             # Initial, clean pose
             x_start = batch.x
 
-            # Start from pure noise
-            x_t = torch.randn_like(batch.x)
-
-            # Run step-wise inference
-            for t_scalar in reversed(range(steps)):
-
-                t_graph = torch.full(
-                    (num_graphs,),
-                    t_scalar,
-                    device=device,
-                    dtype=torch.long,
-                )
-                t = t_graph[batch.batch]  # node-level timestep
-
-                pred_noise, _ = model.forward_with_feats(
-                    x_t, t, batch.patches, batch.edge_index, patch_feats, batch.batch
-                )
-
-                # Extract scalars for current timestep t
-                a_t = alphas[t].unsqueeze(-1)
-                ab_t = alphas_cumprod[t].unsqueeze(-1)
-                b_t = betas[t].unsqueeze(-1)
-
-                z = torch.randn_like(x_t) if t_scalar > 0 else torch.zeros_like(x_t)
-
-                # DDPM reverse step: x_t -> x_{t-1}
-                x_t = (1.0 / torch.sqrt(a_t)) * (
-                    x_t - ((1.0 - a_t) / torch.sqrt(1.0 - ab_t + 1e-8)) * pred_noise
-                ) + torch.sqrt(b_t) * z
-
-            # At the end of the diffusion process, x_t should be the predicted clean pose
-            x_0 = x_t
+            # Run reverse diffusion with the shared helper used by training/evaluation code.
+            x_0 = gnn_diffusion.sample_pose(batch, model)
             # Get position and rotation of the predicted and ground truth poses
             gt_pos, gt_rot = split_pose(x_start)
             pred_pos, pred_rot = split_pose(x_0)

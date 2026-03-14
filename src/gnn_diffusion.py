@@ -76,11 +76,53 @@ class GNN_Diffusion:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # calculations for diffusion q(x_t | x_{t-1}) and others
-        betas = linear_beta_schedule(timesteps=steps).to(self.device)
-        alphas = 1.0 - betas
-        alphas_cumprod = torch.cumprod(alphas, axis=0)
-        self.sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-        self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
+        self.betas = linear_beta_schedule(timesteps=steps).to(self.device)
+        self.alphas = 1.0 - self.betas
+        self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
+        self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
+        self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod)
+
+    def reverse_step(self, x_t, pred_noise, t, t_scalar):
+        a_t = self.alphas[t].unsqueeze(-1)
+        ab_t = self.alphas_cumprod[t].unsqueeze(-1)
+        b_t = self.betas[t].unsqueeze(-1)
+
+        z = torch.randn_like(x_t) if t_scalar > 0 else torch.zeros_like(x_t)
+
+        # DDPM reverse update: x_t -> x_{t-1}
+        return (1.0 / torch.sqrt(a_t)) * (
+            x_t - ((1.0 - a_t) / torch.sqrt(1.0 - ab_t + 1e-8)) * pred_noise
+        ) + torch.sqrt(b_t) * z
+
+    def sample_pose(self, batch, model):
+        # Get num graphs in the batch and start from pure noise.
+        num_graphs = int(batch.batch.max().item()) + 1
+        x_t = torch.randn_like(batch.x)
+
+        # Compute visual features once and reuse through all reverse steps.
+        patch_feats = model.visual_features(batch.patches)
+
+        for t_scalar in reversed(range(self.steps)):
+            t_graph = torch.full(
+                (num_graphs,),
+                t_scalar,
+                device=batch.x.device,
+                dtype=torch.long,
+            )
+            t = t_graph[batch.batch]
+
+            pred_noise, _ = model.forward_with_feats(
+                x_t,
+                t,
+                batch.patches,
+                batch.edge_index,
+                patch_feats,
+                batch.batch,
+            )
+
+            x_t = self.reverse_step(x_t, pred_noise, t, t_scalar)
+
+        return x_t
 
     def q_sample(self, x_start, t, noise=None):
         if noise is None:
