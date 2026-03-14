@@ -25,7 +25,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-from model.full_models import *
+from model.efficient_gat import Eff_GAT
 from puzzle_dataset import *
 from dataset_celeb import CelebA_DataSet
 from gnn_diffusion import *
@@ -125,24 +125,6 @@ def main(
     )
 
     # %%
-    # Function to add rotational info for the model to work
-    def add_rot(batch):
-        # Add/force "no rotation" feature [1, 0] for every node in the batch
-        N = batch.x.size(0)  # total nodes across all graphs in batch
-        rot = torch.zeros(N, 2, dtype=batch.x.dtype, device=batch.x.device)
-        rot[:, 0] = 1.0
-
-        if batch.x.size(1) == 2:
-            batch.x = torch.cat([batch.x, rot], dim=1)  # [N,4]
-        else:
-            batch.x[:, 2:4] = rot  # overwrite existing rot channels
-
-        batch.rot = rot
-        batch.rot_index = torch.zeros(N, dtype=torch.long, device=batch.x.device)
-
-        return batch
-
-    # %%
     # Switch model to evaluation mode
     model.eval()
 
@@ -169,8 +151,7 @@ def main(
                 flush=True,
             )
 
-            # Add rotation dimensions and send batch to device
-            batch = add_rot(batch).to(device)
+            batch = batch.to(device)
 
             # Get num batches (graphs) in the current batch of data
             num_graphs = int(batch.batch.max().item()) + 1
