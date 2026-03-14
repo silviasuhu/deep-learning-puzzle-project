@@ -1,14 +1,11 @@
 # %% [markdown]
-# # Run inference
+# # Run evaluation
 #
-# This runs an inference/forward step on a non-training, non-validation dataset and returns:
-#
+# This runs an evaluation on the test dataset and returns:
 #  - Individual accuracy for translation and rotation for each batch
 #  - Global accuracy for translation and rotation the whole set
 #
 #  Requires:
-#
-#  - Test dataset path
 #  - Model checkpoint
 
 # %% [markdown]
@@ -41,6 +38,7 @@ def main(
     visual_model: str,
     gnn_model: str,
     degree: int,
+    missing_percentage: int,
 ):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -72,7 +70,7 @@ def main(
         unique_graph=None,
         all_equivariant=False,
         random_dropout=False,
-        missing_percentage=0,
+        missing_percentage=missing_percentage,
     )
 
     # %% [markdown]
@@ -84,12 +82,6 @@ def main(
         PROJECT_ROOT / "outputs" / "checkpoints" / model_checkpoint,
         weights_only=False,
         map_location=device,
-    )
-
-    state_dict = (
-        checkpoint["model_state_dict"]
-        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint
-        else checkpoint
     )
 
     # Load model
@@ -105,7 +97,7 @@ def main(
     # Send model to device
     model.to(device)
 
-    model.load_state_dict(state_dict)
+    model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
     print("Model parameters after loading checkpoint:", flush=True)
@@ -114,9 +106,6 @@ def main(
 
     # %% [markdown]
     # ## 3.- Run inference for the whole dataset
-
-    # %% [markdown]
-    #
 
     # %%
     # Dataloader for inference
@@ -350,6 +339,12 @@ if __name__ == "__main__":
             "Must match the value used during training. Default: -1"
         ),
     )
+    ap.add_argument(
+        "-missing_percentage",
+        type=int,
+        default=0,
+        help="Percentage of missing pieces in the puzzle (0-100). Default is 0 (no missing pieces).",
+    )
 
     args = ap.parse_args()
     print(args)
@@ -363,4 +358,5 @@ if __name__ == "__main__":
         gnn_model=args.gnn_model,
         degree=args.degree,
         model_checkpoint=args.model_checkpoint,
+        missing_percentage=args.missing_percentage,
     )
