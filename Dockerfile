@@ -30,8 +30,13 @@ FROM pytorch/pytorch:2.6.0-cuda12.6-cudnn9-runtime
 
 WORKDIR /app
 
+# Enable immediate flushing of stdout and stderr logs, which is useful for logging and debugging.
 ENV PYTHONUNBUFFERED=1
 
+# Install python dependencies.
+#
+# Note that there is not need to run `install_requirements_with_xxx.sh` scripts, as the necessary
+# dependencies are already included in the base image. We only need to install the additional dependencies specified in the requirements.txt file.
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
