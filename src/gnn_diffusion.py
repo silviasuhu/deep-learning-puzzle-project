@@ -133,6 +133,69 @@ class GNN_Diffusion:
 
         return sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
 
+    def true_ddim_step(self, x_t, pred_noise, t_current, t_prev):
+        # 1. Get the cumulative alphas
+        ab_t = self.alphas_cumprod[t_current].unsqueeze(-1)
+
+        if t_prev < 0:
+            ab_t_prev = torch.ones_like(ab_t)  # Step 0 has no noise
+        else:
+            ab_t_prev = self.alphas_cumprod[t_prev].unsqueeze(-1)
+
+        # 2. Predict the perfectly clean state (x_0)
+        pred_x0 = (x_t - torch.sqrt(1.0 - ab_t) * pred_noise) / torch.sqrt(ab_t + 1e-8)
+
+        # 3. Calculate the direction pointing to target step
+        dir_xt = torch.sqrt(1.0 - ab_t_prev) * pred_noise
+
+        # 4. Combine to get the exact state at t_prev
+        x_prev = torch.sqrt(ab_t_prev) * pred_x0 + dir_xt
+
+        return x_prev
+
+    def accelerated_sample_pose(self, batch, model, sampling_steps=50):
+        if sampling_steps <= 0:
+            raise ValueError("sampling_steps must be a positive integer")
+
+        num_graphs = int(batch.batch.max().item()) + 1
+        x_t = torch.randn_like(batch.x)
+        patch_feats = model.visual_features(batch.patches)
+
+        sampling_steps = min(int(sampling_steps), self.steps)
+
+        # Create a stable descending sequence of target steps.
+        raw_times = torch.linspace(self.steps - 1, 0, steps=sampling_steps)
+        times = []
+        for t in raw_times.round().to(torch.long).tolist():
+            if not times or t != times[-1]:
+                times.append(t)
+
+        if times[-1] != 0:
+            times.append(0)
+
+        time_pairs = list(zip(times[:-1], times[1:])) + [(times[-1], -1)]
+
+        for t_current_scalar, t_prev_scalar in time_pairs:
+            t_graph = torch.full(
+                (num_graphs,), t_current_scalar, device=batch.x.device, dtype=torch.long
+            )
+            t_current = t_graph[batch.batch]
+
+            # Network predicts the noise at the current step
+            pred_noise, _ = model.forward_with_feats(
+                x_t,
+                t_current,
+                batch.patches,
+                batch.edge_index,
+                patch_feats,
+                batch.batch,
+            )
+
+            # Jump directly to the previous target step
+            x_t = self.true_ddim_step(x_t, pred_noise, t_current_scalar, t_prev_scalar)
+
+        return x_t
+
     def training_step(self, batch, model, criterion, optimizer):
 
         optimizer.zero_grad()

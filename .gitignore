@@ -218,3 +218,4 @@ checkpoints
 outputs
 wandb
 test_outputs
+output_images
