@@ -86,6 +86,52 @@ class EdgeGNN_Diffusion:
         self.sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
 
+    def reverse_step(self, x_t, pred_noise, t, t_scalar):
+        a_t = self.alphas[t].unsqueeze(-1)
+        ab_t = self.alphas_cumprod[t].unsqueeze(-1)
+        b_t = self.betas[t].unsqueeze(-1)
+
+        z = torch.randn_like(x_t) if t_scalar > 0 else torch.zeros_like(x_t)
+
+        # DDPM reverse update: x_t -> x_{t-1}
+        return (1.0 / torch.sqrt(a_t)) * (
+            x_t - ((1.0 - a_t) / torch.sqrt(1.0 - ab_t + 1e-8)) * pred_noise
+        ) + torch.sqrt(b_t) * z
+
+    def sample_pose(self, batch, model):
+        # Get num graphs in the batch and start from pure noise.
+        num_graphs = int(batch.batch.max().item()) + 1
+        x_t = torch.randn_like(batch.x)
+
+        # Compute visual features once and reuse through all reverse steps.
+        patch_feats = model.visual_features(batch.patches)
+
+        # Compute border feats once and reuse through all reverse steps
+        border_feats = model.compute_edge_features(batch.patches, batch.edge_index)
+
+        for t_scalar in reversed(range(self.steps)):
+            t_graph = torch.full(
+                (num_graphs,),
+                t_scalar,
+                device=batch.x.device,
+                dtype=torch.long,
+            )
+            t = t_graph[batch.batch]
+
+            pred_noise, _ = model.forward_with_feats(
+                x_t,
+                t,
+                batch.patches,
+                batch.edge_index,
+                border_feats,
+                patch_feats,
+                batch.batch,
+            )
+
+            x_t = self.reverse_step(x_t, pred_noise, t, t_scalar)
+
+        return x_t
+
     def q_sample(self, x_start, t, noise=None):
         if noise is None:
             noise = torch.randn_like(x_start)
@@ -146,6 +192,71 @@ class EdgeGNN_Diffusion:
         loss.backward()
         optimizer.step()
         return loss.item()
+
+    def true_ddim_step(self, x_t, pred_noise, t_current, t_prev):
+        # 1. Get the cumulative alphas
+        ab_t = self.alphas_cumprod[t_current].unsqueeze(-1)
+
+        if t_prev < 0:
+            ab_t_prev = torch.ones_like(ab_t)  # Step 0 has no noise
+        else:
+            ab_t_prev = self.alphas_cumprod[t_prev].unsqueeze(-1)
+
+        # 2. Predict the perfectly clean state (x_0)
+        pred_x0 = (x_t - torch.sqrt(1.0 - ab_t) * pred_noise) / torch.sqrt(ab_t + 1e-8)
+
+        # 3. Calculate the direction pointing to target step
+        dir_xt = torch.sqrt(1.0 - ab_t_prev) * pred_noise
+
+        # 4. Combine to get the exact state at t_prev
+        x_prev = torch.sqrt(ab_t_prev) * pred_x0 + dir_xt
+
+        return x_prev
+
+    def accelerated_sample_pose(self, batch, model, sampling_steps=50):
+        if sampling_steps <= 0:
+            raise ValueError("sampling_steps must be a positive integer")
+
+        num_graphs = int(batch.batch.max().item()) + 1
+        x_t = torch.randn_like(batch.x)
+        patch_feats = model.visual_features(batch.patches)
+        border_feats = model.compute_edge_features(batch.patches, batch.edge_index)
+
+        sampling_steps = min(int(sampling_steps), self.steps)
+
+        # Create a stable descending sequence of target steps.
+        raw_times = torch.linspace(self.steps - 1, 0, steps=sampling_steps)
+        times = []
+        for t in raw_times.round().to(torch.long).tolist():
+            if not times or t != times[-1]:
+                times.append(t)
+
+        if times[-1] != 0:
+            times.append(0)
+
+        time_pairs = list(zip(times[:-1], times[1:])) + [(times[-1], -1)]
+
+        for t_current_scalar, t_prev_scalar in time_pairs:
+            t_graph = torch.full(
+                (num_graphs,), t_current_scalar, device=batch.x.device, dtype=torch.long
+            )
+            t_current = t_graph[batch.batch]
+
+            # Network predicts the noise at the current step
+            pred_noise, _ = model.forward_with_feats(
+                x_t,
+                t_current,
+                batch.patches,
+                batch.edge_index,
+                border_feats,
+                patch_feats,
+                batch.batch,
+            )
+
+            # Jump directly to the previous target step
+            x_t = self.true_ddim_step(x_t, pred_noise, t_current_scalar, t_prev_scalar)
+
+        return x_t
 
     def validation_step(self, batch, model, criterion):
 

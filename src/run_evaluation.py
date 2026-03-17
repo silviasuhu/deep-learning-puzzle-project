@@ -27,6 +27,11 @@ from puzzle_dataset import *
 from dataset_celeb import CelebA_DataSet
 from gnn_diffusion import *
 
+from puzzle_edgefeat_dataset import Puzzle_Dataset_Edge_ROT
+from edgegnn_diffusion import EdgeGNN_Diffusion
+from model.border_gat import Border_GAT
+
+
 
 # %%
 def main(
@@ -62,16 +67,29 @@ def main(
 
     # Create puzzle dataset
     # Load puzzle dataset and sample an element
-    test_puzzle_dt = Puzzle_Dataset_ROT(
-        dataset=test_dataset_base,
-        patch_per_dim=[(puzzle_sizes, puzzle_sizes)],
-        augment=False,
-        degree=degree,
-        unique_graph=None,
-        all_equivariant=False,
-        random_dropout=False,
-        missing_percentage=missing_percentage,
-    )
+    if gnn_model == "edge_transformer":
+        test_puzzle_dt = Puzzle_Dataset_Edge_ROT(
+            dataset=test_dataset_base,
+            patch_per_dim=[(puzzle_sizes, puzzle_sizes)],
+            augment=False,
+            degree=degree,
+            unique_graph=None,
+            all_equivariant=False,
+            random_dropout=False,
+            missing_percentage=missing_percentage,
+        )
+
+    else:
+        test_puzzle_dt = Puzzle_Dataset_ROT(
+            dataset=test_dataset_base,
+            patch_per_dim=[(puzzle_sizes, puzzle_sizes)],
+            augment=False,
+            degree=degree,
+            unique_graph=None,
+            all_equivariant=False,
+            random_dropout=False,
+            missing_percentage=missing_percentage,
+        )
 
     # %% [markdown]
     # ## 2.- Load model with checkpoint
@@ -85,14 +103,24 @@ def main(
     )
 
     # Load model
-    model = Eff_GAT(
-        steps=steps,
-        input_channels=4,
-        output_channels=4,
-        n_layers=4,
-        model=visual_model,
-        architecture=gnn_model,
+    if gnn_model == "edge_transformer":
+        model = Border_GAT(
+            steps=steps,
+            input_channels=4,
+            output_channels=4,
+            n_layers=4,
+            model=visual_model,
+            architecture=gnn_model,
     )
+    else:
+        model = Eff_GAT(
+            steps=steps,
+            input_channels=4,
+            output_channels=4,
+            n_layers=4,
+            model=visual_model,
+            architecture=gnn_model,
+        )
 
     # Send model to device
     model.to(device)
@@ -117,7 +145,10 @@ def main(
     # Switch model to evaluation mode
     model.eval()
 
-    gnn_diffusion = GNN_Diffusion(steps=steps)
+    if gnn_model == "edge_transformer":
+        gnn_diffusion = EdgeGNN_Diffusion(steps=steps)
+    else:
+        gnn_diffusion = GNN_Diffusion(steps=steps)
 
     # Initialize lists to store metrics for each batch
     test_pos = []
@@ -141,6 +172,8 @@ def main(
 
             # Run reverse diffusion with the shared helper used by training/evaluation code.
             x_0 = gnn_diffusion.sample_pose(batch, model)
+
+
             # Get position and rotation of the predicted and ground truth poses
             gt_pos, gt_rot = split_pose(x_start)
             pred_pos, pred_rot = split_pose(x_0)
