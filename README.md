@@ -166,7 +166,7 @@ options:
   -visual_model VISUAL_MODEL
                         Backbone used to embed image patches into feature vectors. Use 'resnet18equiv' for the equivariant ResNet-18, or any model name supported by timm. Must match training.
   -gnn_model GNN_MODEL
-                        GNN architecture used to predict noise over the pose graph. Options: 'transformer', 'exophormer'. Must match training.
+                        GNN architecture used to predict noise over the pose graph. Options: 'transformer', 'exophormer', "edge_transformer". Must match training.
   -degree DEGREE        Degree of the expander graph that defines patch connectivity. -1 means fully connected. Must match training. Default: -1
 ```
 
@@ -193,9 +193,27 @@ The output report includes setup details and aggregate metrics over all test bat
 - Average rotation accuracy
 - Standard deviation of rotation accuracy
 
-#### Inference Animation
+#### 6. Inference Animation
 
-TODO
+A notebook is provided in "notebooks/inference_visualization_shared_pipeline.ipynb" to perform a denoising of a single sample and visualize the result. 
+
+Contains the same parameters as the `src/run_evaluation.py`, with additional options for visualization customization:
+
+```
+additional options:
+
+  -save_every N          Save frame from denoising trajectory every n steps.
+  -random_sample T/F     Shuffle samples when creating the DataLoader.          
+  -random_seed int/None  Use a random seed to ensure sample picking reproducibility. Use "None" to pick a random sample every time.
+  -prediction_only T/F   Run only denoising, without generating visualization.       
+  -make_gif T/F          Make an animated .gif with all the sampled frames.
+  -gif_fps int           FPS of the gif.
+  -max_batches  int      Number of batches to process.
+  -output_dir DIR        Directory to save the metrics and visualizations.
+  -sampler  DDPM/DDIM    Sample to use for denoising. DDIM is faster and allows lower number of steps than training. DDPM must have the same number of steps as training.
+  -sampling_steps int    Number of denoising stpes. Only used if sampler == "DDIM"
+  -verbose_progress T/F  Print progress. 
+```
 
 ### Notes & Troubleshooting
 
@@ -212,4 +230,48 @@ print(torch.cuda.is_available())
 
 ## Experiments
 
-TODO
+The current implementation has been trained varying the GNN model implementation, the number of pieces in the puzzle training set, and the percentage of missing pieces in the puzzles:
+
+| Diffusion steps | Batch size | Model           | Sizes   | Degree | Epochs | Missing pieces | GPU                      | GPU-RAM |
+|-----------------|------------|-----------------|---------|--------|-------|----------------|--------------------------|---------|
+|             300 |         10 | Transformer     |       6 |     -1 |   150 |              0 | RTX 3060Ti               | 8GB     |
+|             300 |         64 | Expohormer      |       6 |     60 |   150 |              0 | RTX H100                 | 80GB    |
+|             300 |         10 | Exophormer      | 6--7--8 |     60 |   500 |              0 | RTX A4000                | 16GB    |
+|             300 |         10 | Expohormer      | 6 to 20 |     60 |   400 |              0 | RTX H100                 | 80GB    |
+|             300 |         12 | Transformer     |       6 |     -1 |   135 |            10% | NVIDIA T4 (Google Cloud) | 16GB    |
+|             300 |        100 | Transformer     |       6 |     -1 |   135 |            20% | RTX H100                 | 80GB    |
+|             300 |        100 | EdgeTransformer |       6 |     -1 |   200 |             0% | RTX H100                 | 80GB    |
+
+Each model was then evaluated using DDPM, 300 denoising steps, for puzzles of different number of pieces. Several metrics were collected:
+
+- Position error (for each image, mean Euclidean distance between the predicted patch position and the ground truth):
+
+- Position accuracy (fraction of pieces whose prediction falls within a distance threshold (0.05 r.d.u) from the ground truth):
+
+- Rotation error (for each image, mean angular distance between the predicted patch position and the ground truth):
+
+- Rotation accuracy (fraction of pieces whose prediction falls within an angle threshold (10 rad) from the ground truth):
+
+### Mean position accuracy results of the whole test dataset:
+
+| Model           | Trained Sizes         | Degree | Epoch | Missing pieces | Accuracy 4x4 | Accuracy 6x6 | Accuracy 7x7 | Accuracy 8x8 | Accuracy 10x10 | Accuracy 14x14 | Accuracy 15x15 | Accuracy 19x19 | Accuracy 20x20 |
+|-----------------|-----------------------|--------|-------|----------------|--------------|--------------|--------------|--------------|----------------|----------------|----------------|----------------|----------------|
+| Transformer     |                     6 |     -1 |   150 |              0 |       0,0348 |       0,9375 |       0,0054 |       0,0124 |         0,0123 |         0,0049 |          0,005 |        -       |        -       |
+| Expohormer      |                     6 |     60 |   150 |              0 |       0,0204 |       0,9623 |       0,0012 |       0,0028 |         0,0036 |         0,0027 |         0,0021 |         0,0017 |         0,0021 |
+| Exophormer      |           6 -- 7 -- 8 |     60 |   500 |              0 |       0,0153 |       0,9885 |        0,989 |       0,8203 |         0,0385 |         0,0129 |         0,0072 |         0,0042 |         0,0046 |
+| Expohormer      | 6 8 10 12 14 16 18 20 |     60 |   400 |              0 |        0,067 |       0,9636 |       0,0085 |       0,7256 |         0,9373 |         0,9294 |          0,012 |          0,004 |         0,7192 |
+| Transformer     |                     6 |     -1 |   135 |            10% |       0,0183 |       0,9024 |       0,0068 |       0,0155 |          0,009 |         0,0038 |         0,0048 |        -       |        -       |
+| Transformer     |                     6 |     -1 |   200 |            20% |       0,0224 |       0,6976 |       0,0084 |       0,0092 |         0,0078 |         0,0041 |         0,0042 |        -       |        -       |
+| EdgeTransformer |                     6 |     -1 |   150 |             0% |       0,0431 |       0,8068 |       0,0125 |       0,0254 |          0,013 |         0,0052 |        -       |        -       |        -       |
+
+### Mean rotation accuracy results of the whole test dataset:
+
+| Model           | Trained Sizes         | Degree | Epoch | Missing pieces | Accuracy 4x4 | Accuracy 6x6 | Accuracy 7x7 | Accuracy 8x8 | Accuracy 10x10 | Accuracy 14x14 | Accuracy 15x15 | Accuracy 19x19 | Accuracy 20x20 |
+|-----------------|-----------------------|--------|-------|----------------|--------------|--------------|--------------|--------------|----------------|----------------|----------------|----------------|----------------|
+| Transformer     |                     6 |     -1 |   150 |              0 |       0,7773 |        0,963 |       0,6037 |       0,6273 |          0,563 |         0,5006 |         0,4768 |        -       |        -       |
+| Expohormer      |                     6 |     60 |   150 |              0 |       0,6791 |       0,9746 |       0,4301 |       0,5599 |         0,4852 |         0,4325 |         0,3572 |         0,3504 |         0,3956 |
+| Exophormer      |           6 -- 7 -- 8 |     60 |   500 |              0 |       0,7691 |       0,9853 |       0,9895 |       0,9035 |         0,7111 |         0,4774 |         0,5107 |         0,4785 |         0,4703 |
+| Expohormer      | 6 8 10 12 14 16 18 20 |     60 |   400 |              0 |       0,7902 |       0,9731 |       0,5588 |       0,8875 |          0,953 |         0,9513 |         0,7342 |          0,772 |         0,9499 |
+| Transformer     |                     6 |     -1 |   135 |            10% |       0,7709 |       0,9486 |       0,5812 |       0,6182 |         0,5509 |         0,4796 |         0,4656 |        -       |        -       |
+| Transformer     |                     6 |     -1 |   200 |            20% |       0,8122 |       0,9118 |       0,5847 |       0,6158 |         0,5209 |           0,46 |         0,4418 |        -       |        -       |
+| EdgeTransformer |                     6 |     -1 |   150 |             0% |       0,8514 |       0,9589 |       0,6186 |       0,6725 |         0,5648 |         0,4942 |        -       |        -       |        -       |
