@@ -246,11 +246,28 @@ Each model was then evaluated using DDPM, 300 denoising steps, for puzzles of di
 
 - Position error (for each image, mean Euclidean distance between the predicted patch position and the ground truth):
 
+<p align="center">
+<img width="140" height="57" alt="pos_err" src="https://github.com/user-attachments/assets/047d0fad-f576-48cc-b798-ad62096e82f3" />
+</p>
+
 - Position accuracy (fraction of pieces whose prediction falls within a distance threshold (0.05 r.d.u) from the ground truth):
+- 
+<p align="center">
+<img width="203" height="57" alt="pos_acc" src="https://github.com/user-attachments/assets/1d44f90e-e9c7-4830-9272-e8a0cfd79114" />
+</p>
 
 - Rotation error (for each image, mean angular distance between the predicted patch position and the ground truth):
 
+<p align="center">
+<img width="311" height="57" alt="rot_err" src="https://github.com/user-attachments/assets/3127df01-ea26-4fc9-b9c3-3533a70853a8" />
+</p>
+
 - Rotation accuracy (fraction of pieces whose prediction falls within an angle threshold (10 rad) from the ground truth):
+
+<p align="center">
+<img width="461" height="57" alt="rot_acc" src="https://github.com/user-attachments/assets/913a037a-09a1-45bf-937b-ba881734d887" />
+</p>
+
 
 ### Mean position accuracy results of the whole test dataset:
 
