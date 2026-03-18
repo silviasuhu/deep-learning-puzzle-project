@@ -2,6 +2,11 @@
 
 This repository contains the code and experiments for a postgraduate-level deep learning project. The instructions below guide you through setting up a reproducible development environment on Linux and preparing the required dataset.
 
+
+<p align="center">
+<img width="1079" height="314" alt="Screenshot from 2026-03-18 12-14-40" src="https://github.com/user-attachments/assets/0449aa9f-ce60-49ac-a1ca-7b1dc05c179f" />
+</p>
+
 ## Prerequisites
 
 - Python 3.12.12 (this exact version was used during development and testing; other versions may work but are not guaranteed)
@@ -232,15 +237,15 @@ print(torch.cuda.is_available())
 
 The current implementation has been trained varying the GNN model implementation, the number of pieces in the puzzle training set, and the percentage of missing pieces in the puzzles:
 
-| Diffusion steps | Batch size | Model           | Sizes   | Degree | Epochs | Missing pieces | GPU                      | GPU-RAM |
-|-----------------|------------|-----------------|---------|--------|-------|----------------|--------------------------|---------|
-|             300 |         10 | Transformer     |       6 |    100 |   150 |              0 | RTX 3060Ti               | 8GB     |
-|             300 |         64 | Expohormer      |       6 |     60 |   150 |              0 | RTX H100                 | 80GB    |
-|             300 |         10 | Exophormer      | 6--7--8 |     60 |   500 |              0 | RTX A4000                | 16GB    |
-|             300 |         10 | Expohormer      | 6 to 20 |     60 |   400 |              0 | RTX H100                 | 80GB    |
-|             300 |         12 | Transformer     |       6 |    100 |   135 |            10% | NVIDIA T4 (Google Cloud) | 16GB    |
-|             300 |        100 | Transformer     |       6 |    100 |   135 |            20% | RTX H100                 | 80GB    |
-|             300 |        100 | EdgeTransformer |       6 |    100 |   200 |             0% | RTX H100                 | 80GB    |
+| Diffusion steps | Batch size | Model           | Sizes   | Degree | Epochs | Missing pieces | 
+|-----------------|------------|-----------------|---------|--------|-------|----------------|
+|             300 |         10 | Transformer     |       6 |    100 |   150 |              0 | 
+|             300 |         64 | Expohormer      |       6 |     60 |   150 |              0 | 
+|             300 |         10 | Exophormer      | 6--7--8 |     60 |   500 |              0 |
+|             300 |         10 | Expohormer      | 6 to 20 |     60 |   400 |              0 |
+|             300 |         12 | Transformer     |       6 |    100 |   135 |            10% |
+|             300 |        100 | Transformer     |       6 |    100 |   135 |            20% |
+|             300 |        100 | EdgeTransformer |       6 |    100 |   200 |             0% |
 
 Each model was then evaluated using DDPM, 300 denoising steps, for puzzles of different number of pieces. Several metrics were collected:
 
@@ -251,7 +256,7 @@ Each model was then evaluated using DDPM, 300 denoising steps, for puzzles of di
 </p>
 
 - Position accuracy (fraction of pieces whose prediction falls within a distance threshold (0.05 r.d.u) from the ground truth):
-- 
+  
 <p align="center">
 <img width="203" height="57" alt="pos_acc" src="https://github.com/user-attachments/assets/1d44f90e-e9c7-4830-9272-e8a0cfd79114" />
 </p>
@@ -271,24 +276,28 @@ Each model was then evaluated using DDPM, 300 denoising steps, for puzzles of di
 
 ### Mean position accuracy results of the whole test dataset:
 
+Baseline model and training are indicated in italics.
+
+Accuracy values for puzzle sizes used in training are indicated in bold.
+
 | Model           | Trained Sizes         | Degree | Epoch | Missing pieces | Accuracy 4x4 | Accuracy 6x6 | Accuracy 7x7 | Accuracy 8x8 | Accuracy 10x10 | Accuracy 14x14 | Accuracy 15x15 | Accuracy 19x19 | Accuracy 20x20 |
 |-----------------|-----------------------|--------|-------|----------------|--------------|--------------|--------------|--------------|----------------|----------------|----------------|----------------|----------------|
-| Transformer     |                     6 |    100 |   150 |              0 |       0,0348 |       0,9375 |       0,0054 |       0,0124 |         0,0123 |         0,0049 |          0,005 |        -       |        -       |
-| Expohormer      |                     6 |     60 |   150 |              0 |       0,0204 |       0,9623 |       0,0012 |       0,0028 |         0,0036 |         0,0027 |         0,0021 |         0,0017 |         0,0021 |
-| Exophormer      |           6 -- 7 -- 8 |     60 |   500 |              0 |       0,0153 |       0,9885 |        0,989 |       0,8203 |         0,0385 |         0,0129 |         0,0072 |         0,0042 |         0,0046 |
-| Expohormer      | 6 8 10 12 14 16 18 20 |     60 |   400 |              0 |        0,067 |       0,9636 |       0,0085 |       0,7256 |         0,9373 |         0,9294 |          0,012 |          0,004 |         0,7192 |
-| Transformer     |                     6 |    100 |   135 |            10% |       0,0183 |       0,9024 |       0,0068 |       0,0155 |          0,009 |         0,0038 |         0,0048 |        -       |        -       |
-| Transformer     |                     6 |    100 |   200 |            20% |       0,0224 |       0,6976 |       0,0084 |       0,0092 |         0,0078 |         0,0041 |         0,0042 |        -       |        -       |
-| EdgeTransformer |                     6 |    100 |   150 |             0% |       0,0431 |       0,8068 |       0,0125 |       0,0254 |          0,013 |         0,0052 |        -       |        -       |        -       |
+|*Transformer*   |                     *6* |    *100* |   *150* |              *0* |       0,0348 |       ***0,9375*** |       0,0054 |       0,0124 |         0,0123 |         0,0049 |          0,005 |        -       |        -       |
+| Expohormer      |                     6 |     60 |   150 |              0 |       0,0204 |       **0,9623** |       0,0012 |       0,0028 |         0,0036 |         0,0027 |         0,0021 |         0,0017 |         0,0021 |
+| Exophormer      |           6 -- 7 -- 8 |     60 |   500 |              0 |       0,0153 |       **0,9885** |        **0,989** |       **0,8203** |         0,0385 |         0,0129 |         0,0072 |         0,0042 |         0,0046 |
+| Expohormer      | 6 8 10 12 14 16 18 20 |     60 |   400 |              0 |        0,067 |       **0,9636** |       0,0085 |       **0,7256** |         **0,9373** |         **0,9294** |          0,012 |          0,004 |         **0,7192** |
+| Transformer     |                     6 |    100 |   135 |            10% |       0,0183 |       **0,9024** |       0,0068 |       0,0155 |          0,009 |         0,0038 |         0,0048 |        -       |        -       |
+| Transformer     |                     6 |    100 |   200 |            20% |       0,0224 |       **0,6976** |       0,0084 |       0,0092 |         0,0078 |         0,0041 |         0,0042 |        -       |        -       |
+| EdgeTransformer |                     6 |    100 |   150 |             0% |       0,0431 |       **0,8068** |       0,0125 |       0,0254 |          0,013 |         0,0052 |        -       |        -       |        -       |
 
 ### Mean rotation accuracy results of the whole test dataset:
 
 | Model           | Trained Sizes         | Degree | Epoch | Missing pieces | Accuracy 4x4 | Accuracy 6x6 | Accuracy 7x7 | Accuracy 8x8 | Accuracy 10x10 | Accuracy 14x14 | Accuracy 15x15 | Accuracy 19x19 | Accuracy 20x20 |
 |-----------------|-----------------------|--------|-------|----------------|--------------|--------------|--------------|--------------|----------------|----------------|----------------|----------------|----------------|
-| Transformer     |                     6 |    100 |   150 |              0 |       0,7773 |        0,963 |       0,6037 |       0,6273 |          0,563 |         0,5006 |         0,4768 |        -       |        -       |
-| Expohormer      |                     6 |     60 |   150 |              0 |       0,6791 |       0,9746 |       0,4301 |       0,5599 |         0,4852 |         0,4325 |         0,3572 |         0,3504 |         0,3956 |
-| Exophormer      |           6 -- 7 -- 8 |     60 |   500 |              0 |       0,7691 |       0,9853 |       0,9895 |       0,9035 |         0,7111 |         0,4774 |         0,5107 |         0,4785 |         0,4703 |
-| Expohormer      | 6 8 10 12 14 16 18 20 |     60 |   400 |              0 |       0,7902 |       0,9731 |       0,5588 |       0,8875 |          0,953 |         0,9513 |         0,7342 |          0,772 |         0,9499 |
-| Transformer     |                     6 |    100 |   135 |            10% |       0,7709 |       0,9486 |       0,5812 |       0,6182 |         0,5509 |         0,4796 |         0,4656 |        -       |        -       |
-| Transformer     |                     6 |    100 |   200 |            20% |       0,8122 |       0,9118 |       0,5847 |       0,6158 |         0,5209 |           0,46 |         0,4418 |        -       |        -       |
-| EdgeTransformer |                     6 |    100 |   150 |             0% |       0,8514 |       0,9589 |       0,6186 |       0,6725 |         0,5648 |         0,4942 |        -       |        -       |        -       |
+| *Transformer*     |                     *6* |    *100* |   *150* |              *0* |       0,7773 |        ***0,963*** |       0,6037 |       0,6273 |          0,563 |         0,5006 |         0,4768 |        -       |        -       |
+| Expohormer      |                     6 |     60 |   150 |              0 |       0,6791 |       **0,9746** |       0,4301 |       0,5599 |         0,4852 |         0,4325 |         0,3572 |         0,3504 |         0,3956 |
+| Exophormer      |           6 -- 7 -- 8 |     60 |   500 |              0 |       0,7691 |       **0,9853** |       **0,9895** |       **0,9035** |         0,7111 |         0,4774 |         0,5107 |         0,4785 |         0,4703 |
+| Expohormer      | 6 8 10 12 14 16 18 20 |     60 |   400 |              0 |       0,7902 |       **0,9731** |       0,5588 |       **0,8875** |          **0,953** |         **0,9513** |         0,7342 |          0,772 |         **0,9499** |
+| Transformer     |                     6 |    100 |   135 |            10% |       0,7709 |       **0,9486** |       0,5812 |       0,6182 |         0,5509 |         0,4796 |         0,4656 |        -       |        -       |
+| Transformer     |                     6 |    100 |   200 |            20% |       0,8122 |       **0,9118** |       0,5847 |       0,6158 |         0,5209 |           0,46 |         0,4418 |        -       |        -       |
+| EdgeTransformer |                     6 |    100 |   150 |             0% |       0,8514 |       **0,9589** |       0,6186 |       0,6725 |         0,5648 |         0,4942 |        -       |        -       |        -       |
