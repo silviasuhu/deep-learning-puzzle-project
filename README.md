@@ -7,11 +7,11 @@ This repository contains the code and experiments for a postgraduate-level deep 
 <img width="1079" height="314" alt="Screenshot from 2026-03-18 12-14-40" src="https://github.com/user-attachments/assets/0449aa9f-ce60-49ac-a1ca-7b1dc05c179f" />
 </p>
 
-## Prerequisites
+## Development Environment Setup in Linux
+
+### Prerequisites
 
 - Python 3.12.12 (this exact version was used during development and testing; other versions may work but are not guaranteed)
-
-## Development Environment Setup in Linux
 
 These are the steps to setup a development environment for Linux after cloning this repository:
 
