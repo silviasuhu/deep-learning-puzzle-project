@@ -233,7 +233,7 @@ import torch
 print(torch.cuda.is_available())
 ```
 
-## Experiments
+## Experiments & Results
 
 The current implementation has been trained varying the GNN model implementation, the number of pieces in the puzzle training set, and the percentage of missing pieces in the puzzles:
 
@@ -301,3 +301,19 @@ Accuracy values for puzzle sizes used in training are indicated in bold.
 | Transformer     |                     6 |    100 |   135 |            10% |       0,7709 |       **0,9486** |       0,5812 |       0,6182 |         0,5509 |         0,4796 |         0,4656 |        -       |        -       |
 | Transformer     |                     6 |    100 |   200 |            20% |       0,8122 |       **0,9118** |       0,5847 |       0,6158 |         0,5209 |           0,46 |         0,4418 |        -       |        -       |
 | EdgeTransformer |                     6 |    100 |   150 |             0% |       0,8514 |       **0,9589** |       0,6186 |       0,6725 |         0,5648 |         0,4942 |        -       |        -       |        -       |
+
+
+## Conclusions
+
+- Both Transformer and Exophormer (60%) architectures both achieve strong performance in position and rotation accuracy for puzzles sizes within their respective training datasets.
+- Edge-Transformer model underperforms compared to the Transformer and Exophormer (60%) models, suggesting that the current design of border feature computation and edge representation requires further investigation.
+- Rotation accuracy shows partial generalization to puzzle sizes outside the training distribution.
+- However, position accuracy does not generalize, with no meaningful recovery observed for unseen puzzle sizes.
+- Models trained with missing pieces perform at the baseline level (10% missing pieces) or with a slight degradation (20% missing pieces) in position accuracy.
+- Graph Neural Network (GNN)-based models exhibit significant memory scalability issues as the number of pieces increases, making training challenging even when sparsity techniques are applied (i.e., Exophormer 60%).
+
+## Future Research
+
+- Finding and testing new implementation ideas that deal with the memory problems encountered in puzzles with a high number of pieces.
+- Explore alternative edge and border feature representations to improve the performance of Edge-Transformer models.
+- Generalize the method by expanding the current dataset to include a wider range of image types, textures, and structural patterns.
